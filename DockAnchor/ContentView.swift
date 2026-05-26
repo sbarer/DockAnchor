@@ -17,7 +17,7 @@ private func getAppVersion() -> String {
 
 // MARK: - Display Arrangement View
 struct DisplayArrangementView: View {
-    let displays: [DockMonitor.DisplayInfo]
+    let displays: [DisplayInfo]
     @Binding var selectedDisplayUUID: String
     var maxHeight: CGFloat = 120
 
@@ -100,7 +100,7 @@ struct DisplayArrangementView: View {
 
 struct DisplayRectangleView: View {
     @Environment(\.colorScheme) var colorScheme
-    let display: DockMonitor.DisplayInfo
+    let display: DisplayInfo
     let isSelected: Bool
     let size: CGSize
 
