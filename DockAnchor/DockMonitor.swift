@@ -99,6 +99,7 @@ class DockMonitor: NSObject, ObservableObject {
     private var dockPosition: DockPosition = .bottom
     private var cancellables = Set<AnyCancellable>()
     private var permissionCheckTimer: Timer?
+    private var hotCornerWatchTimer: Timer?
 
     /// Gets the current anchor display ID (derived from UUID)
     private var anchorDisplayID: CGDirectDisplayID {
@@ -591,13 +592,8 @@ class DockMonitor: NSObject, ObservableObject {
             return
         }
 
-        // Only relocate if we have multiple displays
-        guard availableDisplays.count > 1 else {
-            return
-        }
-
         // Check if dock is already on the anchored display
-        if let currentDockDisplay = getCurrentDockDisplayID(), currentDockDisplay == anchorDisplayID {
+        if isDockOnAnchoredDisplay() {
             DispatchQueue.main.async { [weak self] in
                 self?.statusMessage = "Dock is already on \(anchorDisplay.name)"
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
@@ -610,140 +606,145 @@ class DockMonitor: NSObject, ObservableObject {
                 }
             }
             return
-        }
-
-        DispatchQueue.main.async { [weak self] in
-            self?.statusMessage = "Relocating dock to \(anchorDisplay.name)..."
-        }
-
-        // Perform relocation on background thread to not block UI
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            // Save current mouse position
-            let originalPosition = CGEvent(source: nil)?.location ?? .zero
-
-            // Ensure event tap is active so we can intercept user mouse input
-            // If monitoring wasn't started, we need to temporarily create the tap
-            var temporaryTapCreated = false
-            if self.eventTap == nil {
-                temporaryTapCreated = self.createEventTapForRelocation()
-            }
-
-            // Set relocating flag - this causes the event tap to discard all mouse events
-            // This is the key to preventing user mouse movement from interfering
-            self.isRelocating = true
-
-            // Hide cursor during the operation for better UX
-            DispatchQueue.main.sync {
-                NSCursor.hide()
-            }
-
-            // Create an event source for our synthetic events
-            let eventSource = CGEventSource(stateID: .hidSystemState)
-
-            // Get points for the movement
-            let approachPoint = self.getApproachPoint(for: anchorDisplay)
-            let edgePoint = self.getDockTriggerPoint(for: anchorDisplay)
-
-            // Warp to approach point first
-            CGWarpMouseCursorPosition(approachPoint)
-            Thread.sleep(forTimeInterval: 0.03)
-
-            // Generate mouse move events toward the edge (this is what triggers dock movement)
-            for i in 0..<8 {
-                let progress = CGFloat(i) / 7.0
-                let currentX = approachPoint.x + (edgePoint.x - approachPoint.x) * progress
-                let currentY = approachPoint.y + (edgePoint.y - approachPoint.y) * progress
-                let currentPoint = CGPoint(x: currentX, y: currentY)
-
-                // Force cursor position and post event
-                CGWarpMouseCursorPosition(currentPoint)
-                if let moveEvent = CGEvent(mouseEventSource: eventSource, mouseType: .mouseMoved, mouseCursorPosition: currentPoint, mouseButton: .left) {
-                    // Mark as our synthetic event so our tap lets it through
-                    moveEvent.setIntegerValueField(.eventSourceUserData, value: self.syntheticEventMarker)
-                    moveEvent.post(tap: .cghidEventTap)
-                }
-                Thread.sleep(forTimeInterval: 0.015)
-            }
-
-            // Hold at edge with continued events - this is where stability matters most
-            for _ in 0..<8 {
-                CGWarpMouseCursorPosition(edgePoint)
-                if let moveEvent = CGEvent(mouseEventSource: eventSource, mouseType: .mouseMoved, mouseCursorPosition: edgePoint, mouseButton: .left) {
-                    // Mark as our synthetic event so our tap lets it through
-                    moveEvent.setIntegerValueField(.eventSourceUserData, value: self.syntheticEventMarker)
-                    moveEvent.post(tap: .cghidEventTap)
-                }
-                Thread.sleep(forTimeInterval: 0.025)
-            }
-
-            // Move mouse back to original position
-            CGWarpMouseCursorPosition(originalPosition)
-
-            // Clear relocating flag - resume normal event handling
-            self.isRelocating = false
-
-            // Clean up temporary event tap if we created one
-            if temporaryTapCreated {
-                self.removeTemporaryEventTap()
-            }
-
-            // Show cursor again
-            DispatchQueue.main.sync {
-                NSCursor.unhide()
-            }
-
+        } else {
             DispatchQueue.main.async { [weak self] in
-                self?.statusMessage = "Dock relocated to \(anchorDisplay.name)"
+                self?.statusMessage = "Relocating dock to \(anchorDisplay.name)..."
+            }
 
-                // Reset status after delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                    guard let self = self else { return }
-                    if self.isActive {
-                        self.statusMessage = "Dock Anchor Active - Monitoring mouse movement"
-                    } else {
-                        self.statusMessage = "Dock Anchor Ready"
+            // Perform relocation on background thread to not block UI
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self = self else { return }
+
+                // Save current mouse position
+                let originalPosition = CGEvent(source: nil)?.location ?? .zero
+
+                // Ensure event tap is active so we can intercept user mouse input
+                // If monitoring wasn't started, we need to temporarily create the tap
+                var temporaryTapCreated = false
+                if self.eventTap == nil {
+                    temporaryTapCreated = self.createEventTapForRelocation()
+                }
+
+                // Set relocating flag - this causes the event tap to discard all mouse events
+                // This is the key to preventing user mouse movement from interfering
+                self.isRelocating = true
+
+                // Hide cursor during the operation for better UX
+                DispatchQueue.main.sync {
+                    NSCursor.hide()
+                }
+
+                // Create an event source for our synthetic events
+                let eventSource = CGEventSource(stateID: .hidSystemState)
+
+                // Get points for the movement
+                let approachPoint = self.getApproachPoint(for: anchorDisplay)
+                let edgePoint = self.getDockTriggerPoint(for: anchorDisplay)
+
+                // Warp to approach point first
+                CGWarpMouseCursorPosition(approachPoint)
+                Thread.sleep(forTimeInterval: 0.03)
+
+                // Generate mouse move events toward the edge (this is what triggers dock movement)
+                for i in 0..<8 {
+                    let progress = CGFloat(i) / 7.0
+                    let currentX = approachPoint.x + (edgePoint.x - approachPoint.x) * progress
+                    let currentY = approachPoint.y + (edgePoint.y - approachPoint.y) * progress
+                    let currentPoint = CGPoint(x: currentX, y: currentY)
+
+                    // Force cursor position and post event
+                    CGWarpMouseCursorPosition(currentPoint)
+                    if let moveEvent = CGEvent(mouseEventSource: eventSource, mouseType: .mouseMoved, mouseCursorPosition: currentPoint, mouseButton: .left) {
+                        // Mark as our synthetic event so our tap lets it through
+                        moveEvent.setIntegerValueField(.eventSourceUserData, value: self.syntheticEventMarker)
+                        moveEvent.post(tap: .cghidEventTap)
+                    }
+                    Thread.sleep(forTimeInterval: 0.015)
+                }
+
+                // Hold at edge with continued events - this is where stability matters most
+                for _ in 0..<8 {
+                    CGWarpMouseCursorPosition(edgePoint)
+                    if let moveEvent = CGEvent(mouseEventSource: eventSource, mouseType: .mouseMoved, mouseCursorPosition: edgePoint, mouseButton: .left) {
+                        // Mark as our synthetic event so our tap lets it through
+                        moveEvent.setIntegerValueField(.eventSourceUserData, value: self.syntheticEventMarker)
+                        moveEvent.post(tap: .cghidEventTap)
+                    }
+                    Thread.sleep(forTimeInterval: 0.025)
+                }
+
+                // Move mouse back to original position
+                CGWarpMouseCursorPosition(originalPosition)
+
+                // Clear relocating flag - resume normal event handling
+                self.isRelocating = false
+
+                // Clean up temporary event tap if we created one
+                if temporaryTapCreated {
+                    self.removeTemporaryEventTap()
+                }
+
+                // Show cursor again
+                DispatchQueue.main.sync {
+                    NSCursor.unhide()
+                }
+
+                DispatchQueue.main.async { [weak self] in
+                    self?.statusMessage = "Dock relocated to \(anchorDisplay.name)"
+
+                    // Reset status after delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                        guard let self = self else { return }
+                        if self.isActive {
+                            self.statusMessage = "Dock Anchor Active - Monitoring mouse movement"
+                        } else {
+                            self.statusMessage = "Dock Anchor Ready"
+                        }
                     }
                 }
             }
         }
     }
 
-    /// Gets the display ID where the dock is currently located
+    /// Gets the display ID where the dock is currently located.
+    /// Primary method: compares NSScreen.visibleFrame vs frame — the dock insets
+    /// the visible frame on whichever screen it occupies (fails with auto-hide).
+    /// Fallback: AX API window position.
     private func getCurrentDockDisplayID() -> CGDirectDisplayID? {
-        // Find the Dock application and get its window position
-        let dockApp = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first
+        let key = NSDeviceDescriptionKey("NSScreenNumber")
 
-        guard dockApp != nil else { return nil }
-
-        // Use accessibility API to find dock window position
-        let dockElement = AXUIElementCreateApplication(dockApp!.processIdentifier)
-
-        var windowsValue: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(dockElement, kAXWindowsAttribute as CFString, &windowsValue)
-
-        guard result == .success, let windows = windowsValue as? [AXUIElement], !windows.isEmpty else {
-            return nil
-        }
-
-        // Get the position of the first dock window
-        var positionValue: CFTypeRef?
-        let posResult = AXUIElementCopyAttributeValue(windows[0], kAXPositionAttribute as CFString, &positionValue)
-
-        guard posResult == .success else { return nil }
-
-        var position = CGPoint.zero
-        if let positionValue = positionValue, AXValueGetValue(positionValue as! AXValue, .cgPoint, &position) {
-            // Find which display contains this position
-            for display in availableDisplays {
-                if display.frame.contains(position) {
-                    return display.id
-                }
+        // Primary: visibleFrame inset reveals dock position
+        for screen in NSScreen.screens {
+            guard let displayID = screen.deviceDescription[key] as? CGDirectDisplayID else { continue }
+            let f = screen.frame
+            let vf = screen.visibleFrame
+            switch dockPosition {
+            case .bottom where vf.minY > f.minY: return displayID
+            case .left  where vf.minX > f.minX: return displayID
+            case .right where vf.maxX < f.maxX: return displayID
+            default: continue
             }
         }
 
-        return nil
+        // Fallback: AX API (works with auto-hide, but less reliable)
+        guard let dockApp = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else {
+            return nil
+        }
+        let dockElement = AXUIElementCreateApplication(dockApp.processIdentifier)
+        var windowsValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(dockElement, kAXWindowsAttribute as CFString, &windowsValue) == .success,
+              let windows = windowsValue as? [AXUIElement], !windows.isEmpty else {
+            return nil
+        }
+        var positionValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(windows[0], kAXPositionAttribute as CFString, &positionValue) == .success else {
+            return nil
+        }
+        var position = CGPoint.zero
+        guard let pv = positionValue, AXValueGetValue(pv as! AXValue, .cgPoint, &position) else {
+            return nil
+        }
+        return availableDisplays.first { $0.frame.contains(position) }?.id
     }
 
     /// Gets the approach point (slightly before the edge) for dock trigger animation
@@ -828,10 +829,10 @@ class DockMonitor: NSObject, ObservableObject {
 
             let preserveHotCorners = AppSettings.shared.isHotCornersPreserved(forDisplayUUID: display.uuid)
 
-            // Corner zone: always let through so macOS hot corners receive a continuous
-            // stream of events and can activate reliably. The trigger zone check below is
-            // never reached for corner-zone events, so the dock cannot move from them.
+            // Corner zone: let events through so hot corners activate and start
+            // watching for the dock moving off the anchor display.
             if preserveHotCorners && isLocationInCornerZone(location, for: display) {
+                startHotCornerDockWatch()
                 return false
             }
 
@@ -905,7 +906,37 @@ class DockMonitor: NSObject, ObservableObject {
         getCornerZones(for: display).contains { $0.contains(location) }
     }
 
-    
+    /// Returns true if the dock is on the anchored display (or only one display is connected).
+    func isDockOnAnchoredDisplay() -> Bool {
+        guard availableDisplays.count > 1 else { return true }
+        guard let currentDockDisplay = getCurrentDockDisplayID() else { return false }
+        return currentDockDisplay == anchorDisplayID
+    }
+
+    /// Starts a 1s repeating timer that relocates the dock if it leaves the anchor display.
+    /// No-ops if a watch is already running. Stops automatically once the dock is back.
+    private func startHotCornerDockWatch() {
+        guard hotCornerWatchTimer == nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.hotCornerWatchTimer == nil else { return }
+            // One-shot delay before first check — gives macOS time to move the dock
+            // after the hot corner activates. Also acts as a duplicate-watch guard
+            // during the delay (hotCornerWatchTimer is non-nil the whole time).
+            self.hotCornerWatchTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                self.hotCornerWatchTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                    guard let self = self else { return }
+                    if self.isDockOnAnchoredDisplay() {
+                        self.hotCornerWatchTimer?.invalidate()
+                        self.hotCornerWatchTimer = nil
+                    } else if !self.isRelocating {
+                        self.relocateDockToAnchoredDisplay()
+                    }
+                }
+            }
+        }
+    }
+
     private func getAllDisplays() -> [DisplayInfo] {
         var displays: [DisplayInfo] = []
         
