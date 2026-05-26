@@ -62,13 +62,26 @@ extension DockMonitor {
         if isDockOnAnchoredDisplay() {
             DispatchQueue.main.async { [weak self] in
                 self?.statusMessage = "Dock is already on \(anchorDisplay.name)"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                     guard let self = self else { return }
                     self.statusMessage = self.isActive ? "Dock Anchor Active - Monitoring mouse movement" : "Dock Anchor Ready"
                 }
             }
             return
         }
+
+        guard !isRelocating else {
+            print("[DockAnchor] relocate: skipped — already relocating")
+            return
+        }
+
+        // Capture position on main thread before dispatch; CGEvent(source:nil) always returns (0,0)
+        let nsMousePos = NSEvent.mouseLocation
+        let mainScreenHeight = NSScreen.main?.frame.height ?? 0
+        let originalPosition = CGPoint(x: nsMousePos.x, y: mainScreenHeight - nsMousePos.y)
+
+        print("[DockAnchor] relocate: starting — originalPos=\(originalPosition) anchorID=\(anchorDisplayID)")
+        isRelocating = true
 
         DispatchQueue.main.async { [weak self] in
             self?.statusMessage = "Relocating dock to \(anchorDisplay.name)..."
@@ -77,14 +90,10 @@ extension DockMonitor {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
 
-            let originalPosition = CGEvent(source: nil)?.location ?? .zero
-
             var temporaryTapCreated = false
             if self.eventTap == nil {
                 temporaryTapCreated = self.createEventTapForRelocation()
             }
-
-            self.isRelocating = true
 
             DispatchQueue.main.sync { NSCursor.hide() }
 
@@ -119,6 +128,7 @@ extension DockMonitor {
             }
 
             CGWarpMouseCursorPosition(originalPosition)
+            print("[DockAnchor] relocate: complete — restoring cursor to \(originalPosition)")
             self.isRelocating = false
 
             if temporaryTapCreated { self.removeTemporaryEventTap() }
@@ -137,8 +147,13 @@ extension DockMonitor {
 
     func isDockOnAnchoredDisplay() -> Bool {
         guard availableDisplays.count > 1 else { return true }
-        guard let currentDockDisplay = getCurrentDockDisplayID() else { return false }
-        return currentDockDisplay == anchorDisplayID
+        guard let currentDockDisplay = getCurrentDockDisplayID() else {
+            print("[DockAnchor] isDockOnAnchor: getCurrentDockDisplayID returned nil")
+            return false
+        }
+        let result = currentDockDisplay == anchorDisplayID
+        print("[DockAnchor] isDockOnAnchor: currentDockID=\(currentDockDisplay) anchorID=\(anchorDisplayID) match=\(result)")
+        return result
     }
 
     private func getCurrentDockDisplayID() -> CGDirectDisplayID? {
@@ -148,28 +163,45 @@ extension DockMonitor {
             guard let displayID = screen.deviceDescription[key] as? CGDirectDisplayID else { continue }
             let f = screen.frame
             let vf = screen.visibleFrame
+            print("[DockAnchor] getCurrentDockDisplayID: screen=\(displayID) frame=\(f) visibleFrame=\(vf) dockPos=\(dockPosition)")
             switch dockPosition {
-            case .bottom where vf.minY > f.minY: return displayID
-            case .left   where vf.minX > f.minX: return displayID
-            case .right  where vf.maxX < f.maxX: return displayID
+            case .bottom where vf.minY > f.minY:
+                print("[DockAnchor] getCurrentDockDisplayID: found dock on \(displayID) via visibleFrame (bottom)")
+                return displayID
+            case .left   where vf.minX > f.minX:
+                print("[DockAnchor] getCurrentDockDisplayID: found dock on \(displayID) via visibleFrame (left)")
+                return displayID
+            case .right  where vf.maxX < f.maxX:
+                print("[DockAnchor] getCurrentDockDisplayID: found dock on \(displayID) via visibleFrame (right)")
+                return displayID
             default: continue
             }
         }
 
+        print("[DockAnchor] getCurrentDockDisplayID: visibleFrame method failed, falling back to AX")
         guard let dockApp = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else {
+            print("[DockAnchor] getCurrentDockDisplayID: dock app not found")
             return nil
         }
         let dockElement = AXUIElementCreateApplication(dockApp.processIdentifier)
         var windowsValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(dockElement, kAXWindowsAttribute as CFString, &windowsValue) == .success,
-              let windows = windowsValue as? [AXUIElement], !windows.isEmpty else { return nil }
+              let windows = windowsValue as? [AXUIElement], !windows.isEmpty else {
+            print("[DockAnchor] getCurrentDockDisplayID: AX windows query failed")
+            return nil
+        }
 
         var positionValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(windows[0], kAXPositionAttribute as CFString, &positionValue) == .success else { return nil }
+        guard AXUIElementCopyAttributeValue(windows[0], kAXPositionAttribute as CFString, &positionValue) == .success else {
+            print("[DockAnchor] getCurrentDockDisplayID: AX position query failed")
+            return nil
+        }
 
         var position = CGPoint.zero
         guard let pv = positionValue, AXValueGetValue(pv as! AXValue, .cgPoint, &position) else { return nil }
-        return availableDisplays.first { $0.frame.contains(position) }?.id
+        let found = availableDisplays.first { $0.frame.contains(position) }?.id
+        print("[DockAnchor] getCurrentDockDisplayID: AX dock position=\(position) found on displayID=\(String(describing: found))")
+        return found
     }
 
     private func getApproachPoint(for display: DisplayInfo) -> CGPoint {

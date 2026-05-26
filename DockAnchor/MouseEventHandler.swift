@@ -189,17 +189,23 @@ extension DockMonitor {
 
     private func startHotCornerDockWatch() {
         guard hotCornerWatchTimer == nil else { return }
+        print("[DockAnchor] startHotCornerDockWatch: starting 2s initial delay")
         DispatchQueue.main.async { [weak self] in
             guard let self = self, self.hotCornerWatchTimer == nil else { return }
             // One-shot delay before first check — gives macOS time to move the dock after hot corner activates
             self.hotCornerWatchTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
                 guard let self = self else { return }
+                print("[DockAnchor] hotCornerWatch: initial delay elapsed, starting 1s poll (anchorID=\(self.anchorDisplayID))")
                 self.hotCornerWatchTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                     guard let self = self else { return }
-                    if self.isDockOnAnchoredDisplay() {
+                    let onAnchor = self.isDockOnAnchoredDisplay()
+                    print("[DockAnchor] hotCornerWatch tick — isDockOnAnchor=\(onAnchor) isRelocating=\(self.isRelocating) anchorID=\(self.anchorDisplayID)")
+                    if onAnchor {
+                        print("[DockAnchor] hotCornerWatch: dock confirmed on anchor, stopping timer")
                         self.hotCornerWatchTimer?.invalidate()
                         self.hotCornerWatchTimer = nil
                     } else if !self.isRelocating {
+                        print("[DockAnchor] hotCornerWatch: dock not on anchor, triggering relocation")
                         self.relocateDockToAnchoredDisplay()
                     }
                 }
