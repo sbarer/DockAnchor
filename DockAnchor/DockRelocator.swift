@@ -54,6 +54,7 @@ extension DockMonitor {
     }
 
     func relocateDockToAnchoredDisplay() {
+        print("[DockAnchor] Starting relocateDockToAnchoredDisplay")
         guard let anchorDisplay = availableDisplays.first(where: { $0.id == anchorDisplayID }) else {
             statusMessage = "Cannot relocate dock - anchor display not found"
             return
@@ -61,10 +62,12 @@ extension DockMonitor {
 
         if isDockOnAnchoredDisplay() {
             DispatchQueue.main.async { [weak self] in
+                print("[DockAnchor:relocateDockToAnchoredDisplay] isDockOnAnchoredDisplay==true, starting timer to check again")
                 self?.statusMessage = "Dock is already on \(anchorDisplay.name)"
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
                     guard let self = self else { return }
                     self.statusMessage = self.isActive ? "Dock Anchor Active - Monitoring mouse movement" : "Dock Anchor Ready"
+                    print("[DockAnchor:relocateDockToAnchoredDisplay] in 1 second check loop")
                 }
             }
             return
@@ -98,12 +101,15 @@ extension DockMonitor {
             DispatchQueue.main.sync { NSCursor.hide() }
 
             let eventSource = CGEventSource(stateID: .hidSystemState)
-            let approachPoint = self.getApproachPoint(for: anchorDisplay)
+            let approachPoint = self.getPastEdgePoint(for: anchorDisplay)
             let edgePoint = self.getDockTriggerPoint(for: anchorDisplay)
+
+            print("[DockAnchor] relocate: cross-boundary sweep from \(approachPoint) to \(edgePoint)")
 
             CGWarpMouseCursorPosition(approachPoint)
             Thread.sleep(forTimeInterval: 0.03)
 
+            // Animate toward edge — no synthetic marker so Dock sees these as real hover events
             for i in 0..<8 {
                 let progress = CGFloat(i) / 7.0
                 let current = CGPoint(
@@ -112,21 +118,24 @@ extension DockMonitor {
                 )
                 CGWarpMouseCursorPosition(current)
                 if let e = CGEvent(mouseEventSource: eventSource, mouseType: .mouseMoved, mouseCursorPosition: current, mouseButton: .left) {
-                    e.setIntegerValueField(.eventSourceUserData, value: self.syntheticEventMarker)
                     e.post(tap: .cghidEventTap)
                 }
                 Thread.sleep(forTimeInterval: 0.015)
             }
 
-            for _ in 0..<8 {
-                CGWarpMouseCursorPosition(edgePoint)
+            // Pin cursor to edge so physical mouse movement can't drift it away during dwell
+            CGAssociateMouseAndMouseCursorPosition(0)
+            CGWarpMouseCursorPosition(edgePoint)
+
+            // Dwell for ~1000ms — macOS dock hover detection requires ~500ms sustained presence
+            for _ in 0..<20 {
                 if let e = CGEvent(mouseEventSource: eventSource, mouseType: .mouseMoved, mouseCursorPosition: edgePoint, mouseButton: .left) {
-                    e.setIntegerValueField(.eventSourceUserData, value: self.syntheticEventMarker)
                     e.post(tap: .cghidEventTap)
                 }
-                Thread.sleep(forTimeInterval: 0.025)
+                Thread.sleep(forTimeInterval: 0.050)
             }
 
+            CGAssociateMouseAndMouseCursorPosition(1)
             CGWarpMouseCursorPosition(originalPosition)
             print("[DockAnchor] relocate: complete — restoring cursor to \(originalPosition)")
             self.isRelocating = false
