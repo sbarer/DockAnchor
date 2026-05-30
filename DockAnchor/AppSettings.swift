@@ -94,6 +94,26 @@ class AppSettings: ObservableObject {
         }
     }
 
+    /// UUIDs of displays where hot corner preservation is disabled (full edge is blocked).
+    /// Displays not in this set default to preserving hot corners.
+    @Published var hotCornersDisabledDisplayUUIDs: Set<String> {
+        didSet {
+            UserDefaults.standard.set(Array(hotCornersDisabledDisplayUUIDs), forKey: "hotCornersDisabledDisplayUUIDs")
+        }
+    }
+
+    func isHotCornersPreserved(forDisplayUUID uuid: String) -> Bool {
+        !hotCornersDisabledDisplayUUIDs.contains(uuid)
+    }
+
+    func setHotCornersPreserved(_ preserved: Bool, forDisplayUUID uuid: String) {
+        if preserved {
+            hotCornersDisabledDisplayUUIDs.remove(uuid)
+        } else {
+            hotCornersDisabledDisplayUUIDs.insert(uuid)
+        }
+    }
+
     @Published var defaultAnchorDisplay: DefaultAnchorDisplay {
         didSet {
             UserDefaults.standard.set(defaultAnchorDisplay.rawValue, forKey: "defaultAnchorDisplay")
@@ -160,6 +180,9 @@ class AppSettings: ObservableObject {
         self.showStatusIcon = UserDefaults.standard.object(forKey: "showStatusIcon") as? Bool ?? true
         self.hideFromDock = UserDefaults.standard.object(forKey: "hideFromDock") as? Bool ?? false
         self.autoRelocateDock = UserDefaults.standard.object(forKey: "autoRelocateDock") as? Bool ?? true
+
+        let savedDisabled = UserDefaults.standard.stringArray(forKey: "hotCornersDisabledDisplayUUIDs") ?? []
+        self.hotCornersDisabledDisplayUUIDs = Set(savedDisabled)
 
         // Get saved default anchor display or default to main display
         let savedDefaultAnchor = UserDefaults.standard.string(forKey: "defaultAnchorDisplay") ?? "Main Display"

@@ -17,7 +17,7 @@ private func getAppVersion() -> String {
 
 // MARK: - Display Arrangement View
 struct DisplayArrangementView: View {
-    let displays: [DockMonitor.DisplayInfo]
+    let displays: [DisplayInfo]
     @Binding var selectedDisplayUUID: String
     var maxHeight: CGFloat = 120
 
@@ -100,7 +100,7 @@ struct DisplayArrangementView: View {
 
 struct DisplayRectangleView: View {
     @Environment(\.colorScheme) var colorScheme
-    let display: DockMonitor.DisplayInfo
+    let display: DisplayInfo
     let isSelected: Bool
     let size: CGSize
 
@@ -607,6 +607,7 @@ struct SettingsView: View {
             Divider()
 
             // Content
+            ScrollView {
             VStack(spacing: 10) {
                 // Startup & Background
                 VStack(alignment: .leading, spacing: 4) {
@@ -646,6 +647,28 @@ struct SettingsView: View {
                     Text("Used when anchor display is unavailable")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardStyle()
+
+                // Hot Corners
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Hot Corners")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                    Text("When enabled, corner areas are excluded from edge blocking so macOS hot corners still fire.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    ForEach(dockMonitor.availableDisplays) { display in
+                        Toggle(isOn: Binding(
+                            get: { appSettings.isHotCornersPreserved(forDisplayUUID: display.uuid) },
+                            set: { appSettings.setHotCornersPreserved($0, forDisplayUUID: display.uuid) }
+                        )) {
+                            Text(display.name)
+                                .font(.callout)
+                        }
+                        .toggleStyle(.switch)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .cardStyle()
@@ -693,31 +716,32 @@ struct SettingsView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .cardStyle()
+
+                // Footer
+                VStack(spacing: 4) {
+                    Button(action: {
+                        if let url = URL(string: "https://buymeacoffee.com/bwya77") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Text("☕")
+                            Text("Buy Me a Coffee")
+                        }
+                    }
+                    .buttonStyle(.link)
+
+                    Text("Version \(getAppVersion())")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
+                .padding(.bottom, 12)
             }
             .padding(.horizontal)
             .padding(.top, 12)
-
-            Spacer()
-
-            // Footer
-            VStack(spacing: 4) {
-                Button(action: {
-                    if let url = URL(string: "https://buymeacoffee.com/bwya77") {
-                        NSWorkspace.shared.open(url)
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Text("☕")
-                        Text("Buy Me a Coffee")
-                    }
-                }
-                .buttonStyle(.link)
-
-                Text("Version \(getAppVersion())")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
             }
-            .padding(.bottom, 12)
         }
         .frame(width: 420, height: 680)
         .background(.background)
