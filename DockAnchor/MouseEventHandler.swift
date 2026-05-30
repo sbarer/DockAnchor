@@ -128,12 +128,6 @@ extension DockMonitor {
 
     private func handleMouseEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         guard type == .mouseMoved else { return Unmanaged.passUnretained(event) }
-
-        if isRelocating {
-            let userData = event.getIntegerValueField(.eventSourceUserData)
-            return userData == syntheticEventMarker ? Unmanaged.passUnretained(event) : nil
-        }
-
         return shouldBlockDockMovement(at: event.location) ? nil : Unmanaged.passUnretained(event)
     }
 
@@ -196,16 +190,22 @@ extension DockMonitor {
             self.hotCornerWatchTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
                 guard let self = self else { return }
                 print("[DockAnchor] hotCornerWatch: initial delay elapsed, starting 1s poll (anchorID=\(self.anchorDisplayID))")
+                var attempt = 0
                 self.hotCornerWatchTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                     guard let self = self else { return }
                     let onAnchor = self.isDockOnAnchoredDisplay()
-                    print("[DockAnchor] hotCornerWatch tick — isDockOnAnchor=\(onAnchor) isRelocating=\(self.isRelocating) anchorID=\(self.anchorDisplayID)")
+                    print("[DockAnchor] hotCornerWatch tick \(attempt + 1) — isDockOnAnchor=\(onAnchor) isRelocating=\(self.isRelocating) anchorID=\(self.anchorDisplayID)")
                     if onAnchor {
                         print("[DockAnchor] hotCornerWatch: dock confirmed on anchor, stopping timer")
                         self.hotCornerWatchTimer?.invalidate()
                         self.hotCornerWatchTimer = nil
+                    } else if attempt >= 5 {
+                        print("[DockAnchor] hotCornerWatch: giving up after \(attempt) attempts")
+                        self.hotCornerWatchTimer?.invalidate()
+                        self.hotCornerWatchTimer = nil
                     } else if !self.isRelocating {
-                        print("[DockAnchor] hotCornerWatch: dock not on anchor, triggering relocation")
+                        attempt += 1
+                        print("[DockAnchor] hotCornerWatch: triggering relocation attempt \(attempt)")
                         self.relocateDockToAnchoredDisplay()
                     }
                 }

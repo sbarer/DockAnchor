@@ -136,8 +136,13 @@ extension DockMonitor {
             }
 
             CGAssociateMouseAndMouseCursorPosition(1)
-            CGWarpMouseCursorPosition(originalPosition)
-            print("[DockAnchor] relocate: complete — restoring cursor to \(originalPosition)")
+            let safePosition = self.clampedToScreenEdge(originalPosition)
+            CGWarpMouseCursorPosition(safePosition)
+            let mainH = NSScreen.main?.frame.height ?? 0
+            let destName = self.availableDisplays.first(where: {
+                CGRect(x: $0.frame.minX, y: mainH - $0.frame.maxY, width: $0.frame.width, height: $0.frame.height).contains(safePosition)
+            })?.name ?? "unknown"
+            print("[DockAnchor] relocate: complete — restoring cursor to \(safePosition) (original: \(originalPosition)) on screen \(destName)")
             self.isRelocating = false
 
             if temporaryTapCreated { self.removeTemporaryEventTap() }
@@ -215,30 +220,100 @@ extension DockMonitor {
 
     private func getApproachPoint(for display: DisplayInfo) -> CGPoint {
         let frame = display.frame
+        let safe = getSafeEdgeOffset(for: display)
         let offset: CGFloat = 50
         switch dockPosition {
-        case .bottom: return CGPoint(x: frame.midX, y: frame.maxY - offset)
-        case .left:   return CGPoint(x: frame.minX + offset, y: frame.midY)
-        case .right:  return CGPoint(x: frame.maxX - offset, y: frame.midY)
+        case .bottom: return CGPoint(x: safe, y: frame.maxY - offset)
+        case .left:   return CGPoint(x: frame.minX + offset, y: safe)
+        case .right:  return CGPoint(x: frame.maxX - offset, y: safe)
         }
     }
 
     private func getPastEdgePoint(for display: DisplayInfo) -> CGPoint {
         let frame = display.frame
+        let safe = getSafeEdgeOffset(for: display)
         let overshoot: CGFloat = 20
         switch dockPosition {
-        case .bottom: return CGPoint(x: frame.midX, y: frame.maxY + overshoot)
-        case .left:   return CGPoint(x: frame.minX - overshoot, y: frame.midY)
-        case .right:  return CGPoint(x: frame.maxX + overshoot, y: frame.midY)
+        case .bottom: return CGPoint(x: safe, y: frame.maxY + overshoot)
+        case .left:   return CGPoint(x: frame.minX - overshoot, y: safe)
+        case .right:  return CGPoint(x: frame.maxX + overshoot, y: safe)
         }
     }
 
     private func getDockTriggerPoint(for display: DisplayInfo) -> CGPoint {
         let frame = display.frame
+        let safe = getSafeEdgeOffset(for: display)
         switch dockPosition {
-        case .bottom: return CGPoint(x: frame.midX, y: frame.maxY - 1)
-        case .left:   return CGPoint(x: frame.minX + 1, y: frame.midY)
-        case .right:  return CGPoint(x: frame.maxX - 1, y: frame.midY)
+        case .bottom: return CGPoint(x: safe, y: frame.maxY - 1)
+        case .left:   return CGPoint(x: frame.minX + 1, y: safe)
+        case .right:  return CGPoint(x: frame.maxX - 1, y: safe)
         }
+    }
+
+    // Returns the midpoint of the largest segment of the dock edge not shared with any other display.
+    private func getSafeEdgeOffset(for display: DisplayInfo) -> CGFloat {
+        let frame = display.frame
+        let (rangeMin, rangeMax): (CGFloat, CGFloat)
+        var covered: [(CGFloat, CGFloat)] = []
+        let t: CGFloat = 2
+
+        switch dockPosition {
+        case .bottom:
+            rangeMin = frame.minX; rangeMax = frame.maxX
+            for other in availableDisplays where other.id != display.id {
+                guard abs(other.frame.minY - frame.maxY) < t || abs(other.frame.maxY - frame.maxY) < t else { continue }
+                let lo = max(frame.minX, other.frame.minX), hi = min(frame.maxX, other.frame.maxX)
+                if hi > lo { covered.append((lo, hi)) }
+            }
+        case .left:
+            rangeMin = frame.minY; rangeMax = frame.maxY
+            for other in availableDisplays where other.id != display.id {
+                guard abs(other.frame.maxX - frame.minX) < t else { continue }
+                let lo = max(frame.minY, other.frame.minY), hi = min(frame.maxY, other.frame.maxY)
+                if hi > lo { covered.append((lo, hi)) }
+            }
+        case .right:
+            rangeMin = frame.minY; rangeMax = frame.maxY
+            for other in availableDisplays where other.id != display.id {
+                guard abs(other.frame.minX - frame.maxX) < t else { continue }
+                let lo = max(frame.minY, other.frame.minY), hi = min(frame.maxY, other.frame.maxY)
+                if hi > lo { covered.append((lo, hi)) }
+            }
+        }
+
+        let free = subtractRanges(from: (rangeMin, rangeMax), subtract: covered)
+        let best = free.max(by: { ($0.1 - $0.0) < ($1.1 - $1.0) }) ?? (rangeMin, rangeMax)
+        print("[DockAnchor] getSafeEdgeOffset: range=\(rangeMin)..\(rangeMax) covered=\(covered) best=\(best)")
+        return (best.0 + best.1) / 2
+    }
+
+    private func clampedToScreenEdge(_ point: CGPoint, buffer: CGFloat = 15) -> CGPoint {
+        let mainH = NSScreen.main?.frame.height ?? 0
+        for display in availableDisplays {
+            let f = display.frame
+            let cgBounds = CGRect(x: f.minX, y: mainH - f.maxY, width: f.width, height: f.height)
+            guard cgBounds.contains(point) else { continue }
+            return CGPoint(
+                x: max(f.minX + buffer, min(f.maxX - buffer, point.x)),
+                y: max(cgBounds.minY + buffer, min(cgBounds.maxY - buffer, point.y))
+            )
+        }
+        return point
+    }
+
+    private func subtractRanges(from range: (CGFloat, CGFloat), subtract: [(CGFloat, CGFloat)]) -> [(CGFloat, CGFloat)] {
+        var free = [range]
+        for cov in subtract {
+            free = free.flatMap { seg -> [(CGFloat, CGFloat)] in
+                let (a, b) = seg
+                let c = max(cov.0, a), d = min(cov.1, b)
+                if d <= c { return [(a, b)] }
+                var result: [(CGFloat, CGFloat)] = []
+                if c > a { result.append((a, c)) }
+                if d < b { result.append((d, b)) }
+                return result
+            }
+        }
+        return free
     }
 }
