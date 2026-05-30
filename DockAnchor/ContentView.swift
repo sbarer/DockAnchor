@@ -614,12 +614,18 @@ struct SettingsView: View {
                     Text("Startup & Background")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                    Toggle("Start at Login", isOn: $appSettings.startAtLogin)
-                        .font(.callout)
-                        .toggleStyle(.switch)
-                    Toggle("Run in Background", isOn: $appSettings.runInBackground)
-                        .font(.callout)
-                        .toggleStyle(.switch)
+                    HStack {
+                        Text("Start at Login").font(.callout)
+                        Spacer()
+                        Toggle("", isOn: $appSettings.startAtLogin)
+                            .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                    }
+                    HStack {
+                        Text("Run in Background").font(.callout)
+                        Spacer()
+                        Toggle("", isOn: $appSettings.runInBackground)
+                            .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .cardStyle()
@@ -629,9 +635,12 @@ struct SettingsView: View {
                     Text("Dock Behavior")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                    Toggle("Auto-Move Dock", isOn: $appSettings.autoRelocateDock)
-                        .font(.callout)
-                        .toggleStyle(.switch)
+                    HStack {
+                        Text("Auto-Move Dock").font(.callout)
+                        Spacer()
+                        Toggle("", isOn: $appSettings.autoRelocateDock)
+                            .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                    }
                     HStack {
                         Text("Default Anchor")
                             .font(.callout)
@@ -660,14 +669,15 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     ForEach(dockMonitor.availableDisplays) { display in
-                        Toggle(isOn: Binding(
-                            get: { appSettings.isHotCornersPreserved(forDisplayUUID: display.uuid) },
-                            set: { appSettings.setHotCornersPreserved($0, forDisplayUUID: display.uuid) }
-                        )) {
-                            Text(display.name)
-                                .font(.callout)
+                        HStack {
+                            Text(display.name).font(.callout)
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { appSettings.isHotCornersPreserved(forDisplayUUID: display.uuid) },
+                                set: { appSettings.setHotCornersPreserved($0, forDisplayUUID: display.uuid) }
+                            ))
+                            .toggleStyle(.switch).labelsHidden().controlSize(.small)
                         }
-                        .toggleStyle(.switch)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -678,12 +688,18 @@ struct SettingsView: View {
                     Text("Interface")
                         .font(.subheadline)
                         .fontWeight(.semibold)
-                    Toggle("Show Menu Bar Icon", isOn: $appSettings.showStatusIcon)
-                        .font(.callout)
-                        .toggleStyle(.switch)
-                    Toggle("Hide from Dock", isOn: $appSettings.hideFromDock)
-                        .font(.callout)
-                        .toggleStyle(.switch)
+                    HStack {
+                        Text("Show Menu Bar Icon").font(.callout)
+                        Spacer()
+                        Toggle("", isOn: $appSettings.showStatusIcon)
+                            .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                    }
+                    HStack {
+                        Text("Hide from Dock").font(.callout)
+                        Spacer()
+                        Toggle("", isOn: $appSettings.hideFromDock)
+                            .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                    }
                     HStack {
                         Text("Theme")
                             .font(.callout)
