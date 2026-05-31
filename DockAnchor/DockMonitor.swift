@@ -109,6 +109,12 @@ class DockMonitor: NSObject, ObservableObject {
         changeAnchorDisplay(toUUID: uuid)
     }
 
+    func applyDockSettings(position: DockPosition?, tileSize: Int?) {
+        guard position != nil || tileSize != nil else { return }
+        if let position = position { changeDockPosition(to: position) }
+        if let size = tileSize { changeDockSize(to: size) }
+    }
+
     deinit {
         if Thread.isMainThread {
             stopMonitoring()

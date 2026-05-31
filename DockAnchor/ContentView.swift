@@ -617,13 +617,13 @@ struct ContentView: View {
                     Text("Size")
                         .font(.callout)
                     Spacer()
-                    Text("\(Int(liveDockTileSize))px")
+                    Text("\(Int(liveDockTileSize))%")
                         .font(.callout)
                         .monospacedDigit()
                         .foregroundColor(.secondary)
                 }
-                Slider(value: $liveDockTileSize, in: 20...60, step: 1) { editing in
-                    print("[DockSettings] size slider editing=\(editing), current value=\(Int(liveDockTileSize))px")
+                Slider(value: $liveDockTileSize, in: 5...55, step: 5) { editing in
+                    print("[DockSettings] size slider editing=\(editing), current value=\(Int(liveDockTileSize))%")
                     if !editing {
                         dockChangesPending = true
                         DockMonitor.shared.applyDockSettings(position: nil, tileSize: Int(liveDockTileSize))
