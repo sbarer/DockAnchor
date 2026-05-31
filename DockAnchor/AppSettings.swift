@@ -35,16 +35,20 @@ struct DockProfile: Identifiable, Codable, Equatable {
     var anchorDisplayUUID: String
     var createdAt: Date
     var autoActivate: Bool  // Auto-activate when anchor display connects
+    var dockPosition: DockPosition?  // nil = don't override when activating
+    var dockTileSize: Int?           // nil = don't override; macOS range 16-128
 
-    init(id: UUID = UUID(), name: String, anchorDisplayUUID: String, createdAt: Date = Date(), autoActivate: Bool = false) {
+    init(id: UUID = UUID(), name: String, anchorDisplayUUID: String, createdAt: Date = Date(), autoActivate: Bool = false, dockPosition: DockPosition? = nil, dockTileSize: Int? = nil) {
         self.id = id
         self.name = name
         self.anchorDisplayUUID = anchorDisplayUUID
         self.createdAt = createdAt
         self.autoActivate = autoActivate
+        self.dockPosition = dockPosition
+        self.dockTileSize = dockTileSize
     }
 
-    // Custom decoder to handle migration from profiles without autoActivate field
+    // Custom decoder to handle migration from profiles without newer fields
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
@@ -52,6 +56,8 @@ struct DockProfile: Identifiable, Codable, Equatable {
         anchorDisplayUUID = try container.decode(String.self, forKey: .anchorDisplayUUID)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         autoActivate = try container.decodeIfPresent(Bool.self, forKey: .autoActivate) ?? false
+        dockPosition = try container.decodeIfPresent(DockPosition.self, forKey: .dockPosition)
+        dockTileSize = try container.decodeIfPresent(Int.self, forKey: .dockTileSize)
     }
 }
 
@@ -271,14 +277,18 @@ class AppSettings: ObservableObject {
         }
     }
 
-    /// Switches to a profile, updating the anchor display
+    /// Switches to a profile, updating the anchor display and applying any dock overrides
     func switchToProfile(_ profile: DockProfile) {
         activeProfileID = profile.id
         selectedDisplayUUID = profile.anchorDisplayUUID
 
-        // Trigger dock relocation if enabled
+        let hasDockOverride = profile.dockPosition != nil || profile.dockTileSize != nil
+        DockMonitor.shared.applyDockSettings(position: profile.dockPosition, tileSize: profile.dockTileSize)
+
         if autoRelocateDock {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // Allow extra time for the Dock process to restart when settings change
+            let delay: Double = hasDockOverride ? 2.5 : 0.1
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
                 DockMonitor.shared.relocateDockToAnchoredDisplay()
             }
         }

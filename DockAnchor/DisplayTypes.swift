@@ -6,8 +6,18 @@
 import Foundation
 import CoreGraphics
 
-enum DockPosition {
-    case bottom, left, right
+enum DockPosition: String, CaseIterable, Codable {
+    case left = "left"
+    case bottom = "bottom"
+    case right = "right"
+
+    var label: String {
+        switch self {
+        case .left: return "Left"
+        case .bottom: return "Bottom"
+        case .right: return "Right"
+        }
+    }
 }
 
 struct DisplayInfo: Identifiable, Hashable {

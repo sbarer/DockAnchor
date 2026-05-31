@@ -177,7 +177,6 @@ extension View {
 struct ProfileChip: View {
     let profile: DockProfile
     let isActive: Bool
-    let onSelect: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
     @State private var isHovering = false
@@ -195,13 +194,6 @@ struct ProfileChip: View {
                 .foregroundColor(isActive ? .white : .primary)
 
             if isHovering {
-                Button(action: onEdit) {
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(isActive ? .white.opacity(0.8) : .secondary)
-                }
-                .buttonStyle(.plain)
-
                 Button(action: onDelete) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 10))
@@ -228,7 +220,7 @@ struct ProfileChip: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .onTapGesture { onSelect() }
+        .onTapGesture { onEdit() }
         .onHover { hovering in isHovering = hovering }
     }
 }
@@ -287,12 +279,17 @@ struct EditProfileSheet: View {
     let profile: DockProfile
     @State private var profileName: String
     @State private var autoActivate: Bool
+    @State private var showingDeleteConfirmation = false
     @FocusState private var isNameFocused: Bool
 
     init(profile: DockProfile) {
         self.profile = profile
         _profileName = State(initialValue: profile.name)
         _autoActivate = State(initialValue: profile.autoActivate)
+    }
+
+    private var isActive: Bool {
+        appSettings.activeProfileID == profile.id
     }
 
     var body: some View {
@@ -304,13 +301,31 @@ struct EditProfileSheet: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($isNameFocused)
 
+            Divider()
+
             Toggle("Auto-activate when display connects", isOn: $autoActivate)
                 .font(.callout)
                 .toggleStyle(.switch)
 
-            Text("Auto-activates this profile when the anchor display is connected.")
-                .font(.caption)
-                .foregroundColor(.secondary)
+            Divider()
+
+            Button(action: {
+                if isActive {
+                    appSettings.deactivateProfile()
+                    dismiss()
+                } else {
+                    activateWithCurrentEdits()
+                }
+            }) {
+                Label(
+                    isActive ? "Deactivate Profile" : "Activate Profile",
+                    systemImage: isActive ? "stop.circle" : "play.circle"
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+            }
+            .buttonStyle(.bordered)
+            .tint(isActive ? .orange : .accentColor)
 
             HStack {
                 Button("Cancel") {
@@ -318,11 +333,14 @@ struct EditProfileSheet: View {
                 }
                 .keyboardShortcut(.cancelAction)
 
+                Spacer()
+
+                Button("Delete", role: .destructive) {
+                    showingDeleteConfirmation = true
+                }
+
                 Button("Save") {
-                    var updatedProfile = profile
-                    updatedProfile.name = profileName
-                    updatedProfile.autoActivate = autoActivate
-                    appSettings.updateProfile(updatedProfile)
+                    saveProfile()
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)
@@ -333,6 +351,34 @@ struct EditProfileSheet: View {
         .frame(width: 320)
         .background(.background)
         .onAppear { isNameFocused = true }
+        .confirmationDialog(
+            "Delete \"\(profile.name)\"?",
+            isPresented: $showingDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                appSettings.deleteProfile(profile)
+                dismiss()
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
+    }
+
+    private func saveProfile() {
+        var updated = profile
+        updated.name = profileName
+        updated.autoActivate = autoActivate
+        appSettings.updateProfile(updated)
+    }
+
+    private func activateWithCurrentEdits() {
+        var updated = profile
+        updated.name = profileName
+        updated.autoActivate = autoActivate
+        appSettings.updateProfile(updated)
+        appSettings.switchToProfile(updated)
+        dismiss()
     }
 }
 
@@ -345,6 +391,11 @@ struct ContentView: View {
     @State private var editingProfile: DockProfile?
     @State private var newProfileName = ""
     @State private var showingPermissionHelp = false
+    @State private var liveDockPosition: DockPosition = .bottom
+    @State private var liveDockTileSize: Double = 48
+    @State private var originalDockPosition: DockPosition = .bottom
+    @State private var originalDockTileSize: Double = 48
+    @State private var dockChangesPending: Bool = false
 
     private var statusColor: Color {
         if dockMonitor.statusMessage.contains("Blocked") {
@@ -518,7 +569,6 @@ struct ContentView: View {
                                 ProfileChip(
                                     profile: profile,
                                     isActive: appSettings.activeProfileID == profile.id,
-                                    onSelect: { appSettings.switchToProfile(profile) },
                                     onEdit: { editingProfile = profile },
                                     onDelete: { appSettings.deleteProfile(profile) }
                                 )
@@ -529,10 +579,85 @@ struct ContentView: View {
             }
             .cardStyle()
 
-            Spacer()
+            // Dock Settings Section
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Dock")
+                        .font(.headline)
+                    if let profile = appSettings.activeProfile {
+                        Text("· \(profile.name)")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+
+                HStack {
+                    Text("Position")
+                        .font(.callout)
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: { liveDockPosition },
+                        set: { newValue in
+                            print("[DockSettings] position picker → \(newValue.rawValue)")
+                            liveDockPosition = newValue
+                            dockChangesPending = true
+                            DockMonitor.shared.applyDockSettings(position: newValue, tileSize: nil)
+                        }
+                    )) {
+                        ForEach(DockPosition.allCases, id: \.self) { pos in
+                            Text(pos.label).tag(pos)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 180)
+                }
+
+                HStack {
+                    Text("Size")
+                        .font(.callout)
+                    Spacer()
+                    Text("\(Int(liveDockTileSize))px")
+                        .font(.callout)
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                }
+                Slider(value: $liveDockTileSize, in: 20...60, step: 1) { editing in
+                    print("[DockSettings] size slider editing=\(editing), current value=\(Int(liveDockTileSize))px")
+                    if !editing {
+                        dockChangesPending = true
+                        DockMonitor.shared.applyDockSettings(position: nil, tileSize: Int(liveDockTileSize))
+                    }
+                }
+
+                if dockChangesPending {
+                    HStack {
+                        Button("Revert") {
+                            liveDockPosition = originalDockPosition
+                            liveDockTileSize = originalDockTileSize
+                            DockMonitor.shared.applyDockSettings(
+                                position: originalDockPosition,
+                                tileSize: Int(originalDockTileSize)
+                            )
+                            dockChangesPending = false
+                        }
+                        .buttonStyle(.bordered)
+
+                        Spacer()
+
+                        if appSettings.activeProfile != nil {
+                            Button("Save to Profile") {
+                                saveDockSettingsToActiveProfile()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                }
+            }
+            .cardStyle()
         }
         .padding()
-        .frame(width: 420, height: 650)
+        .frame(width: 420, height: 820)
         .background(.background)
         .sheet(isPresented: $showingSettings) {
             SettingsView()
@@ -567,6 +692,10 @@ struct ContentView: View {
             dockMonitor.updateAvailableDisplays()
             // Set the anchor display from settings (using UUID for stable identification)
             dockMonitor.changeAnchorDisplay(toUUID: appSettings.selectedDisplayUUID)
+            initDockState()
+        }
+        .onChange(of: appSettings.activeProfileID) { _, _ in
+            initDockState()
         }
         .onChange(of: appSettings.selectedDisplayUUID) { oldValue, newValue in
             dockMonitor.changeAnchorDisplay(toUUID: newValue)
@@ -578,7 +707,34 @@ struct ContentView: View {
             }
         }
     }
-    
+
+    private func initDockState() {
+        // Read actual system state via `defaults read` (same mechanism as existing dock detection)
+        let systemPosition = DockMonitor.readCurrentDockPosition()
+        let systemSize = Double(DockMonitor.readCurrentDockTileSize())
+
+        if let profile = appSettings.activeProfile {
+            liveDockPosition = profile.dockPosition ?? systemPosition
+            liveDockTileSize = Double(profile.dockTileSize ?? Int(systemSize))
+        } else {
+            liveDockPosition = systemPosition
+            liveDockTileSize = systemSize
+        }
+        originalDockPosition = liveDockPosition
+        originalDockTileSize = liveDockTileSize
+        dockChangesPending = false
+    }
+
+    private func saveDockSettingsToActiveProfile() {
+        guard var profile = appSettings.activeProfile else { return }
+        profile.dockPosition = liveDockPosition
+        profile.dockTileSize = Int(liveDockTileSize)
+        appSettings.updateProfile(profile)
+        originalDockPosition = liveDockPosition
+        originalDockTileSize = liveDockTileSize
+        dockChangesPending = false
+    }
+
 }
 
 struct SettingsView: View {

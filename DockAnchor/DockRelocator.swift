@@ -316,4 +316,96 @@ extension DockMonitor {
         }
         return free
     }
+
+    /// Applies dock position and/or size via System Events's dock preferences API.
+    /// No Dock restart required — System Events updates the Dock in-place with no side effects.
+    func applyDockSettings(position: DockPosition?, tileSize: Int?) {
+        guard position != nil || tileSize != nil else {
+            print("[DockSettings] applyDockSettings: skipped — both args nil")
+            return
+        }
+
+        print("[DockSettings] applyDockSettings: position=\(position?.rawValue ?? "unchanged"), tileSize=\(tileSize.map(String.init) ?? "unchanged")")
+
+        var scriptLines = ["tell application \"System Events\" to tell dock preferences"]
+        if let position = position {
+            scriptLines.append("    set screen edge to \(position.rawValue)")
+        }
+        if let size = tileSize {
+            scriptLines.append("    set dock size to \(size)")
+        }
+        scriptLines.append("end tell")
+        let source = scriptLines.joined(separator: "\n")
+        print("[DockSettings] AppleScript:\n\(source)")
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            // System Events must be running to receive Apple Events
+            if NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.systemevents").isEmpty {
+                print("[DockSettings] System Events not running — launching")
+                DispatchQueue.main.sync {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Library/CoreServices/System Events.app"))
+                }
+                var waited = 0.0
+                while NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.systemevents").isEmpty && waited < 5.0 {
+                    Thread.sleep(forTimeInterval: 0.2)
+                    waited += 0.2
+                }
+                Thread.sleep(forTimeInterval: 0.5) // extra buffer for AE server init
+                print("[DockSettings] System Events ready after \(String(format: "%.1f", waited + 0.5))s")
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                let script = NSAppleScript(source: source)
+                var errorInfo: NSDictionary?
+                script?.executeAndReturnError(&errorInfo)
+                if let errorInfo = errorInfo {
+                    print("[DockSettings] NSAppleScript error: \(errorInfo)")
+                } else {
+                    print("[DockSettings] NSAppleScript applied successfully")
+                }
+                if let position = position {
+                    self?.dockPosition = position
+                    print("[DockSettings] DockMonitor.dockPosition updated to \(position.rawValue)")
+                }
+            }
+        }
+    }
+
+    /// Reads the current dock orientation via `defaults read`. Blocks the calling thread briefly.
+    static func readCurrentDockPosition() -> DockPosition {
+        let task = Process()
+        task.launchPath = "/usr/bin/defaults"
+        task.arguments = ["read", "com.apple.dock", "orientation"]
+        let outPipe = Pipe()
+        task.standardOutput = outPipe
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            task.waitUntilExit()
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return DockPosition(rawValue: str) ?? .bottom
+        } catch {
+            return .bottom
+        }
+    }
+
+    /// Reads the current dock tile size via `defaults read`. Blocks the calling thread briefly.
+    static func readCurrentDockTileSize() -> Int {
+        let task = Process()
+        task.launchPath = "/usr/bin/defaults"
+        task.arguments = ["read", "com.apple.dock", "tilesize"]
+        let outPipe = Pipe()
+        task.standardOutput = outPipe
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            task.waitUntilExit()
+            let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let str = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return Int(str) ?? 48
+        } catch {
+            return 48
+        }
+    }
 }
