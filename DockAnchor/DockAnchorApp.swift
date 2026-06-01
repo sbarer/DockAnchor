@@ -11,19 +11,19 @@ import Combine
 
 class WindowHiderDelegate: NSObject, NSWindowDelegate {
     private var appSettings: AppSettings?
-    
+
     func setup(appSettings: AppSettings) {
         self.appSettings = appSettings
     }
-    
+
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
-        
+
         // If the setting is enabled, hide the app from dock when window is closed
         if appSettings?.hideFromDock == true {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 NSApp.setActivationPolicy(.accessory)
-                
+
                 // Force a dock refresh
                 DistributedNotificationCenter.default().post(
                     name: NSNotification.Name("com.apple.dock.refresh"),
@@ -31,7 +31,7 @@ class WindowHiderDelegate: NSObject, NSWindowDelegate {
                 )
             }
         }
-        
+
         return false
     }
 }
@@ -42,7 +42,7 @@ struct DockAnchorApp: App {
 
     // Use shared instances so they can be accessed from applicationDidFinishLaunching
     @ObservedObject private var appSettings = AppSettings.shared
-    @ObservedObject private var dockMonitor = DockMonitor.shared
+    @ObservedObject private var coordinator = DockCoordinator.shared
     @ObservedObject private var menuBarManager = MenuBarManager.shared
     @ObservedObject private var updateChecker = UpdateChecker.shared
 
@@ -54,7 +54,7 @@ struct DockAnchorApp: App {
             ContentView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environmentObject(appSettings)
-                .environmentObject(dockMonitor)
+                .environmentObject(coordinator)
                 .environmentObject(updateChecker)
                 .preferredColorScheme(appSettings.appTheme.colorScheme)
                 .onAppear {
@@ -78,11 +78,11 @@ struct DockAnchorApp: App {
 
                 Divider()
 
-                Button(dockMonitor.isActive ? "Stop Protection" : "Start Protection") {
-                    if dockMonitor.isActive {
-                        dockMonitor.stopMonitoring()
+                Button(coordinator.isActive ? "Stop Protection" : "Start Protection") {
+                    if coordinator.isActive {
+                        coordinator.stopMonitoring()
                     } else {
-                        dockMonitor.startMonitoring()
+                        coordinator.startMonitoring()
                     }
                 }
                 .keyboardShortcut("p", modifiers: [.command, .option])
@@ -94,7 +94,7 @@ struct DockAnchorApp: App {
 class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     // Use shared instances directly
     private var appSettings: AppSettings { AppSettings.shared }
-    private var dockMonitor: DockMonitor { DockMonitor.shared }
+    private var coordinator: DockCoordinator { DockCoordinator.shared }
     private var menuBarManager: MenuBarManager { MenuBarManager.shared }
     private var updateChecker: UpdateChecker { UpdateChecker.shared }
 
@@ -113,28 +113,28 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Initialize the menu bar with current settings
         // This is the most critical piece - ensures menu bar icon appears
-        menuBarManager.setup(appSettings: appSettings, dockMonitor: dockMonitor, updateChecker: updateChecker)
+        menuBarManager.setup(appSettings: appSettings, coordinator: coordinator, updateChecker: updateChecker)
 
         // Set initial activation policy
         updateActivationPolicy()
 
         // Only perform accessibility-dependent operations if permissions are granted
-        let hasPermissions = dockMonitor.requestAccessibilityPermissions()
+        let hasPermissions = PermissionService.shared.check()
         if hasPermissions {
             // Set the anchor display from settings (using UUID for stable identification)
-            dockMonitor.changeAnchorDisplay(toUUID: appSettings.selectedDisplayUUID)
+            coordinator.changeAnchorDisplay(toUUID: appSettings.selectedDisplayUUID)
 
             // Auto-start monitoring if enabled (with a small delay for system stability)
             if appSettings.runInBackground {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                    self?.dockMonitor.startMonitoring()
+                    self?.coordinator.startMonitoring()
                 }
             }
 
             // Auto-relocate dock to anchored display on launch if enabled
             if appSettings.autoRelocateDock {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                    self?.dockMonitor.relocateDockToAnchoredDisplay()
+                    self?.coordinator.relocateDock()
                 }
             }
         }
@@ -177,7 +177,7 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationWillTerminate(_ notification: Notification) {
         // Clean up when app is actually quitting
-        dockMonitor.stopMonitoring()
+        coordinator.stopMonitoring()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -216,18 +216,18 @@ class MenuBarManager: NSObject, ObservableObject {
 
     private var statusItem: NSStatusItem?
     private var appSettings: AppSettings?
-    private var dockMonitor: DockMonitor?
+    private var coordinator: DockCoordinator?
     private var updateChecker: UpdateChecker?
     private var cancellables = Set<AnyCancellable>()
-    
+
     deinit {
         removeStatusBar()
         cancellables.removeAll()
     }
-    
-    func setup(appSettings: AppSettings, dockMonitor: DockMonitor, updateChecker: UpdateChecker) {
+
+    func setup(appSettings: AppSettings, coordinator: DockCoordinator, updateChecker: UpdateChecker) {
         self.appSettings = appSettings
-        self.dockMonitor = dockMonitor
+        self.coordinator = coordinator
         self.updateChecker = updateChecker
 
         // Setup status bar based on current setting
@@ -262,63 +262,63 @@ class MenuBarManager: NSObject, ObservableObject {
             self?.updateDisplaySubmenu()
         }
     }
-    
+
     private func setupStatusBar() {
         // Remove existing status item first
         removeStatusBar()
-        
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        
+
         if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "dock.rectangle", accessibilityDescription: "DockAnchor")
             button.toolTip = "DockAnchor - Click to open"
             button.action = #selector(statusItemClicked)
             button.target = self
         }
-        
+
         setupStatusMenu()
     }
-    
+
     private func removeStatusBar() {
         if let statusItem = statusItem {
             NSStatusBar.system.removeStatusItem(statusItem)
             self.statusItem = nil
         }
     }
-    
+
     private func setupStatusMenu() {
-        guard let dockMonitor = dockMonitor, let appSettings = appSettings else { return }
-        
+        guard let coordinator = coordinator, let appSettings = appSettings else { return }
+
         let menu = NSMenu()
-        
+
         // Status indicator
         let statusMenuItem = NSMenuItem()
-        updateStatusMenuItem(statusMenuItem, isActive: dockMonitor.isActive)
+        updateStatusMenuItem(statusMenuItem, isActive: coordinator.isActive)
         statusMenuItem.isEnabled = false
         menu.addItem(statusMenuItem)
-        
+
         // Current anchor display
         let anchorMenuItem = NSMenuItem()
-        anchorMenuItem.title = "📍 \(dockMonitor.anchoredDisplay)"
+        anchorMenuItem.title = "📍 \(coordinator.anchoredDisplayName)"
         anchorMenuItem.isEnabled = false
         menu.addItem(anchorMenuItem)
-        
+
         menu.addItem(NSMenuItem.separator())
-        
+
         // Toggle protection
         let toggleMenuItem = NSMenuItem(
-            title: dockMonitor.isActive ? "Stop Protection" : "Start Protection",
+            title: coordinator.isActive ? "Stop Protection" : "Start Protection",
             action: #selector(toggleProtection),
             keyEquivalent: ""
         )
         toggleMenuItem.target = self
         menu.addItem(toggleMenuItem)
-        
+
         menu.addItem(NSMenuItem.separator())
-        
+
         // Quick display selection submenu
         let displaySubmenu = NSMenu()
-        for display in dockMonitor.availableDisplays {
+        for display in coordinator.displays {
             let displayItem = NSMenuItem(
                 title: display.name, // Don't add (Primary) here since it's already in display.name
                 action: #selector(selectDisplay(_:)),
@@ -329,7 +329,7 @@ class MenuBarManager: NSObject, ObservableObject {
             displayItem.state = display.uuid == appSettings.selectedDisplayUUID ? .on : .off
             displaySubmenu.addItem(displayItem)
         }
-        
+
         let displayMenuItem = NSMenuItem(title: "Anchor to Display", action: nil, keyEquivalent: "")
         displayMenuItem.submenu = displaySubmenu
         menu.addItem(displayMenuItem)
@@ -406,9 +406,9 @@ class MenuBarManager: NSObject, ObservableObject {
         )
         showMenuItem.target = self
         menu.addItem(showMenuItem)
-        
+
         menu.addItem(NSMenuItem.separator())
-        
+
         // Quit
         let quitMenuItem = NSMenuItem(
             title: "Quit DockAnchor",
@@ -417,37 +417,37 @@ class MenuBarManager: NSObject, ObservableObject {
         )
         quitMenuItem.target = self
         menu.addItem(quitMenuItem)
-        
+
         statusItem?.menu = menu
-        
+
         // Update menu when monitor status changes
-        dockMonitor.$isActive
+        coordinator.$isActive
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isActive in
                 self?.updateStatusMenuItem(statusMenuItem, isActive: isActive)
                 toggleMenuItem.title = isActive ? "Stop Protection" : "Start Protection"
             }
             .store(in: &cancellables)
-        
+
         // Update anchor display in menu
-        dockMonitor.$anchoredDisplay
+        coordinator.$anchoredDisplayName
             .receive(on: DispatchQueue.main)
             .sink { [weak self] displayName in
                 anchorMenuItem.title = "📍 \(displayName)"
                 self?.refreshDisplaySubmenu()
             }
             .store(in: &cancellables)
-        
+
         // Update tooltip with status
-        dockMonitor.$statusMessage
+        coordinator.$statusMessage
             .receive(on: DispatchQueue.main)
             .sink { [weak self] message in
                 self?.statusItem?.button?.toolTip = "DockAnchor - \(message)"
             }
             .store(in: &cancellables)
-        
+
         // Update display submenu when available displays change
-        dockMonitor.$availableDisplays
+        coordinator.$displays
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateDisplaySubmenu()
@@ -470,11 +470,11 @@ class MenuBarManager: NSObject, ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
     private func updateStatusMenuItem(_ item: NSMenuItem, isActive: Bool) {
         item.title = isActive ? "🟢 Protection Active" : "🔴 Protection Inactive"
     }
-    
+
     private func refreshDisplaySubmenu() {
         guard let menu = statusItem?.menu,
               let displayMenuItem = menu.item(withTitle: "Anchor to Display"),
@@ -491,12 +491,12 @@ class MenuBarManager: NSObject, ObservableObject {
     private func updateDisplaySubmenu() {
         guard let menu = statusItem?.menu,
               let displayMenuItem = menu.item(withTitle: "Anchor to Display"),
-              let dockMonitor = dockMonitor,
+              let coordinator = coordinator,
               let appSettings = appSettings else { return }
 
         // Create new submenu with updated displays
         let newSubmenu = NSMenu()
-        for display in dockMonitor.availableDisplays {
+        for display in coordinator.displays {
             let displayItem = NSMenuItem(
                 title: display.name, // Don't add (Primary) here since it's already in display.name
                 action: #selector(selectDisplay(_:)),
@@ -511,20 +511,20 @@ class MenuBarManager: NSObject, ObservableObject {
         // Replace the submenu
         displayMenuItem.submenu = newSubmenu
     }
-    
+
     @objc private func statusItemClicked() {
         showMainWindow()
     }
-    
+
     @objc private func toggleProtection() {
-        guard let dockMonitor = dockMonitor else { return }
-        if dockMonitor.isActive {
-            dockMonitor.stopMonitoring()
+        guard let coordinator = coordinator else { return }
+        if coordinator.isActive {
+            coordinator.stopMonitoring()
         } else {
-            dockMonitor.startMonitoring()
+            coordinator.startMonitoring()
         }
     }
-    
+
     @objc private func selectDisplay(_ sender: NSMenuItem) {
         guard let displayUUID = sender.representedObject as? String else { return }
         appSettings?.selectedDisplayUUID = displayUUID
@@ -592,7 +592,7 @@ class MenuBarManager: NSObject, ObservableObject {
             NSWorkspace.shared.open(url)
         }
     }
-    
+
     @objc func showMainWindow() {
         // Always restore the dock icon when showing the window (unless hideFromDock is set)
         if !(appSettings?.hideFromDock ?? false) {
@@ -639,12 +639,12 @@ class MenuBarManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
     @objc private func quitApp() {
-        dockMonitor?.stopMonitoring()
+        coordinator?.stopMonitoring()
         NSApp.terminate(nil)
     }
-    
+
     func ensureStatusBarVisible() {
         // Ensure the status bar is visible when hiding from dock
         if statusItem == nil && (appSettings?.showStatusIcon ?? true) {

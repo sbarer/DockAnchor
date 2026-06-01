@@ -337,8 +337,8 @@ DockAnchorTests/
 - **Testable when:** project builds cleanly; `DockMonitor.swift` still exists; extension files gone
 
 **Phase 3: DockCoordinator** `[Phase total: ~15k tokens]`
-- ☐ [Sequential] 3a — `Services/DockCoordinator.swift` — singleton; published properties; `setupCallbacks()` wires all service callbacks; public API methods; timers `[~10k tokens]`
-- ☐ [Sequential] 3b — Update `ApplicationDelegate` to call `DockCoordinator.shared` lifecycle methods; remove `DockMonitor.swift` `[~5k tokens]`
+- ☑ [Sequential] 3a — `Services/DockCoordinator.swift` — singleton; published properties; `setupCallbacks()` wires all service callbacks; public API methods; timers `[~10k tokens]`
+- ☑ [Sequential] 3b — Update `ApplicationDelegate` to call `DockCoordinator.shared` lifecycle methods; remove `DockMonitor.swift` `[~5k tokens]`
 - **Testable when:** app launches, menu bar icon appears, Start Protection works
 
 **Phase 4: View decomposition** `[Phase total: ~30k tokens]`

@@ -384,7 +384,7 @@ struct EditProfileSheet: View {
 
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @EnvironmentObject var dockMonitor: DockMonitor
+    @EnvironmentObject var coordinator: DockCoordinator
     @EnvironmentObject var appSettings: AppSettings
     @State private var showingSettings = false
     @State private var showingNewProfile = false
@@ -398,9 +398,9 @@ struct ContentView: View {
     @State private var dockChangesPending: Bool = false
 
     private var statusColor: Color {
-        if dockMonitor.statusMessage.contains("Blocked") {
+        if coordinator.statusMessage.contains("Blocked") {
             return .red
-        } else if dockMonitor.isActive {
+        } else if coordinator.isActive {
             return .green
         } else {
             return .primary
@@ -428,24 +428,24 @@ struct ContentView: View {
             VStack(spacing: 12) {
                 HStack {
                     // Check if we just blocked a dock movement attempt
-                    if dockMonitor.statusMessage.contains("Blocked") {
+                    if coordinator.statusMessage.contains("Blocked") {
                         Image(systemName: "hand.raised.fill")
                             .foregroundColor(.red)
                             .font(.system(size: 14))
                     } else {
                         Circle()
-                            .fill(dockMonitor.isActive ? Color.green : Color.red)
+                            .fill(coordinator.isActive ? Color.green : Color.red)
                             .frame(width: 12, height: 12)
                     }
 
-                    Text(dockMonitor.statusMessage)
+                    Text(coordinator.statusMessage)
                         .font(.headline)
                         .foregroundColor(statusColor)
 
                     Spacer()
                 }
 
-                if dockMonitor.needsPermissionReset || dockMonitor.statusMessage.lowercased().contains("permission") {
+                if coordinator.needsPermissionReset || coordinator.statusMessage.lowercased().contains("permission") {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.orange)
@@ -459,7 +459,7 @@ struct ContentView: View {
                         .font(.caption)
                         .buttonStyle(.bordered)
                     }
-                } else if !dockMonitor.isActive {
+                } else if !coordinator.isActive {
                     HStack {
                         Image(systemName: "exclamationmark.triangle")
                             .foregroundColor(.orange)
@@ -475,19 +475,19 @@ struct ContentView: View {
             // Control Buttons
             HStack(spacing: 16) {
                 Button(action: {
-                    if dockMonitor.isActive {
-                        dockMonitor.stopMonitoring()
+                    if coordinator.isActive {
+                        coordinator.stopMonitoring()
                     } else {
-                        dockMonitor.startMonitoring()
+                        coordinator.startMonitoring()
                     }
                 }) {
                     HStack {
-                        Image(systemName: dockMonitor.isActive ? "stop.circle" : "play.circle")
-                        Text(dockMonitor.isActive ? "Stop Protection" : "Start Protection")
+                        Image(systemName: coordinator.isActive ? "stop.circle" : "play.circle")
+                        Text(coordinator.isActive ? "Stop Protection" : "Start Protection")
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(dockMonitor.isActive ? Color.red : Color.green)
+                    .background(coordinator.isActive ? Color.red : Color.green)
                     .foregroundColor(.white)
                     .cornerRadius(8)
                 }
@@ -520,7 +520,7 @@ struct ContentView: View {
 
                 // Visual Display Arrangement
                 DisplayArrangementView(
-                    displays: dockMonitor.availableDisplays,
+                    displays: coordinator.displays,
                     selectedDisplayUUID: $appSettings.selectedDisplayUUID,
                     maxHeight: 100
                 )
@@ -531,7 +531,7 @@ struct ContentView: View {
                     Image(systemName: "lock.fill")
                         .foregroundColor(.accentColor)
                         .font(.caption)
-                    Text("Anchored to: \(dockMonitor.anchoredDisplay)")
+                    Text("Anchored to: \(coordinator.anchoredDisplayName)")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Spacer()
@@ -602,7 +602,7 @@ struct ContentView: View {
                             print("[DockSettings] position picker → \(newValue.rawValue)")
                             liveDockPosition = newValue
                             dockChangesPending = true
-                            DockMonitor.shared.applyDockSettings(position: newValue, tileSize: nil)
+                            coordinator.applyDockSettings(position: newValue, tileSize: nil)
                         }
                     )) {
                         ForEach(DockPosition.allCases, id: \.self) { pos in
@@ -626,7 +626,7 @@ struct ContentView: View {
                     print("[DockSettings] size slider editing=\(editing), current value=\(Int(liveDockTileSize))%")
                     if !editing {
                         dockChangesPending = true
-                        DockMonitor.shared.applyDockSettings(position: nil, tileSize: Int(liveDockTileSize))
+                        coordinator.applyDockSettings(position: nil, tileSize: Int(liveDockTileSize))
                     }
                 }
 
@@ -635,7 +635,7 @@ struct ContentView: View {
                         Button("Revert") {
                             liveDockPosition = originalDockPosition
                             liveDockTileSize = originalDockTileSize
-                            DockMonitor.shared.applyDockSettings(
+                            coordinator.applyDockSettings(
                                 position: originalDockPosition,
                                 tileSize: Int(originalDockTileSize)
                             )
@@ -674,12 +674,12 @@ struct ContentView: View {
                 .preferredColorScheme(appSettings.appTheme.colorScheme)
         }
         .sheet(isPresented: $showingPermissionHelp) {
-            PermissionHelpSheet(dockMonitor: dockMonitor)
+            PermissionHelpSheet()
                 .preferredColorScheme(appSettings.appTheme.colorScheme)
         }
         .onAppear {
             // Check permissions on startup and show help if not granted
-            let hasPermissions = dockMonitor.requestAccessibilityPermissions()
+            let hasPermissions = PermissionService.shared.check()
             if !hasPermissions {
                 // Small delay to let the UI appear first
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -688,21 +688,19 @@ struct ContentView: View {
                 // Don't perform any operations that require accessibility permissions
                 return
             }
-            // Update available displays
-            dockMonitor.updateAvailableDisplays()
             // Set the anchor display from settings (using UUID for stable identification)
-            dockMonitor.changeAnchorDisplay(toUUID: appSettings.selectedDisplayUUID)
+            coordinator.changeAnchorDisplay(toUUID: appSettings.selectedDisplayUUID)
             initDockState()
         }
         .onChange(of: appSettings.activeProfileID) { _, _ in
             initDockState()
         }
         .onChange(of: appSettings.selectedDisplayUUID) { oldValue, newValue in
-            dockMonitor.changeAnchorDisplay(toUUID: newValue)
+            coordinator.changeAnchorDisplay(toUUID: newValue)
             // Auto-move dock to the newly selected display if enabled
             if appSettings.autoRelocateDock && oldValue != newValue {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    dockMonitor.relocateDockToAnchoredDisplay()
+                    coordinator.relocateDock()
                 }
             }
         }
@@ -710,8 +708,8 @@ struct ContentView: View {
 
     private func initDockState() {
         // Read actual system state via `defaults read` (same mechanism as existing dock detection)
-        let systemPosition = DockMonitor.readCurrentDockPosition()
-        let systemSize = Double(DockMonitor.readCurrentDockTileSize())
+        let systemPosition = DockResizeService.shared.currentPosition()
+        let systemSize = Double(DockResizeService.shared.currentTileSize())
 
         if let profile = appSettings.activeProfile {
             liveDockPosition = profile.dockPosition ?? systemPosition
@@ -739,7 +737,7 @@ struct ContentView: View {
 
 struct SettingsView: View {
     @EnvironmentObject var appSettings: AppSettings
-    @EnvironmentObject var dockMonitor: DockMonitor
+    @EnvironmentObject var coordinator: DockCoordinator
     @EnvironmentObject var updateChecker: UpdateChecker
     @Environment(\.dismiss) var dismiss
 
@@ -824,7 +822,7 @@ struct SettingsView: View {
                     Text("When enabled, corner areas are excluded from edge blocking so macOS hot corners still fire.")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    ForEach(dockMonitor.availableDisplays) { display in
+                    ForEach(coordinator.displays) { display in
                         HStack {
                             Text(display.name).font(.callout)
                             Spacer()
@@ -878,11 +876,11 @@ struct SettingsView: View {
                         .font(.subheadline)
                         .fontWeight(.semibold)
                     DisplayArrangementView(
-                        displays: dockMonitor.availableDisplays,
+                        displays: coordinator.displays,
                         selectedDisplayUUID: $appSettings.selectedDisplayUUID,
                         maxHeight: 60
                     )
-                    Text("\(dockMonitor.availableDisplays.count) display(s) detected")
+                    Text("\(coordinator.displays.count) display(s) detected")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -917,14 +915,11 @@ struct SettingsView: View {
         }
         .frame(width: 420, height: 680)
         .background(.background)
-        .onAppear {
-            dockMonitor.updateAvailableDisplays()
-        }
+        .onAppear {}
     }
 }
 
 struct PermissionHelpSheet: View {
-    @ObservedObject var dockMonitor: DockMonitor
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
@@ -974,7 +969,7 @@ struct PermissionHelpSheet: View {
                 Spacer()
 
                 Button(action: {
-                    dockMonitor.openAccessibilityPreferences()
+                    PermissionService.shared.openPreferences()
                 }) {
                     HStack {
                         Image(systemName: "gearshape.fill")
@@ -1000,7 +995,7 @@ struct PermissionHelpSheet: View {
     ContentView()
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
         .environmentObject(AppSettings())
-        .environmentObject(DockMonitor())
+        .environmentObject(DockCoordinator.shared)
         .environmentObject(UpdateChecker())
 }
 

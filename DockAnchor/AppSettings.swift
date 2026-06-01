@@ -131,14 +131,14 @@ class AppSettings: ObservableObject {
         }
     }
 
-    /// Display ID for runtime use - computed from UUID via DockMonitor
+    /// Display ID for runtime use - computed from UUID via DisplayService
     var selectedDisplayID: CGDirectDisplayID {
         get {
-            return DockMonitor.shared.getDisplayID(forUUID: selectedDisplayUUID) ?? CGMainDisplayID()
+            return DisplayService.shared.displayID(forUUID: selectedDisplayUUID) ?? CGMainDisplayID()
         }
         set {
             // When setting by ID, look up the UUID
-            if let uuid = DockMonitor.shared.getDisplayUUID(forID: newValue) {
+            if let uuid = DisplayService.shared.uuid(forDisplayID: newValue) {
                 selectedDisplayUUID = uuid
             }
         }
@@ -250,13 +250,13 @@ class AppSettings: ObservableObject {
         selectedDisplayUUID = profile.anchorDisplayUUID
 
         let hasDockOverride = profile.dockPosition != nil || profile.dockTileSize != nil
-        DockMonitor.shared.applyDockSettings(position: profile.dockPosition, tileSize: profile.dockTileSize)
+        DockCoordinator.shared.applyDockSettings(position: profile.dockPosition, tileSize: profile.dockTileSize)
 
         if autoRelocateDock {
             // Allow extra time for the Dock process to restart when settings change
             let delay: Double = hasDockOverride ? 2.5 : 0.1
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                DockMonitor.shared.relocateDockToAnchoredDisplay()
+                DockCoordinator.shared.relocateDock()
             }
         }
     }

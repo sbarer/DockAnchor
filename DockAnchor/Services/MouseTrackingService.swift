@@ -107,7 +107,7 @@ class MouseTrackingService {
     // MARK: - Internal (testable)
 
     func triggerZone(for display: DisplayInfo) -> CGRect {
-        let dockPosition = DockMonitor.shared.dockPosition
+        let dockPosition = DockCoordinator.shared.dockPosition
         switch dockPosition {
         case .bottom:
             return CGRect(x: display.frame.minX, y: display.frame.maxY - 10,
@@ -124,7 +124,7 @@ class MouseTrackingService {
     func cornerZones(for display: DisplayInfo) -> [CGRect] {
         let f = display.frame
         let s = cornerZoneSize
-        let dockPosition = DockMonitor.shared.dockPosition
+        let dockPosition = DockCoordinator.shared.dockPosition
         switch dockPosition {
         case .bottom:
             return [CGRect(x: f.minX, y: f.maxY - s, width: s, height: s),
@@ -143,7 +143,7 @@ class MouseTrackingService {
     }
 
     func shouldBlock(at location: CGPoint) -> Bool {
-        let anchorID = DockMonitor.shared.anchorDisplayID
+        let anchorID = DockCoordinator.shared.anchorDisplayID
         for display in DisplayService.shared.displays {
             if display.id == anchorID { continue }
 
