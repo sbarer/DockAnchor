@@ -58,6 +58,7 @@ extension DockMonitor {
 
         isMonitoring = true
         startPermissionMonitoring()
+        startPositionCheckTimer()
         DispatchQueue.main.async { [weak self] in
             self?.isActive = true
             self?.statusMessage = "Dock Anchor Active - Monitoring mouse movement"
@@ -66,6 +67,7 @@ extension DockMonitor {
 
     func stopMonitoring() {
         stopPermissionMonitoring()
+        stopPositionCheckTimer()
         guard isMonitoring else { return }
 
         isMonitoring = false

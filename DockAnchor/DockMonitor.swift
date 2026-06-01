@@ -30,6 +30,7 @@ class DockMonitor: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     var permissionCheckTimer: Timer?
     var hotCornerWatchTimer: Timer?
+    var positionCheckTimer: Timer?
 
     var anchorDisplayID: CGDirectDisplayID {
         return availableDisplays.first { $0.uuid == anchorDisplayUUID }?.id ?? CGMainDisplayID()

@@ -150,6 +150,28 @@ extension DockMonitor {
         relocateDockToAnchoredDisplay()
     }
 
+    func startPositionCheckTimer() {
+        guard positionCheckTimer == nil else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, self.positionCheckTimer == nil else { return }
+            self.positionCheckTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+                guard let self = self,
+                      AppSettings.shared.autoRelocateDock,
+                      !self.isRelocating,
+                      !self.isDockOnAnchoredDisplay() else { return }
+                print("[DockAnchor] positionCheck: dock not on anchor display, relocating")
+                self.relocateDockToAnchoredDisplay()
+            }
+        }
+    }
+
+    func stopPositionCheckTimer() {
+        DispatchQueue.main.async { [weak self] in
+            self?.positionCheckTimer?.invalidate()
+            self?.positionCheckTimer = nil
+        }
+    }
+
     /// Reads the current dock orientation via `defaults read`. Blocks the calling thread briefly.
     static func readCurrentDockPosition() -> DockPosition {
         let task = Process()

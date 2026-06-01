@@ -389,15 +389,6 @@ class MenuBarManager: NSObject, ObservableObject {
         updateMenuItem.target = self
         menu.addItem(updateMenuItem)
 
-        // Buy Me a Coffee
-        let coffeeMenuItem = NSMenuItem(
-            title: "Buy Me a Coffee ☕",
-            action: #selector(openBuyMeACoffee),
-            keyEquivalent: ""
-        )
-        coffeeMenuItem.target = self
-        menu.addItem(coffeeMenuItem)
-
         // Feedback & Issues
         let feedbackMenuItem = NSMenuItem(
             title: "Feedback & Issues",
@@ -594,12 +585,6 @@ class MenuBarManager: NSObject, ObservableObject {
 
     @objc private func checkForUpdates() {
         updateChecker?.checkForUpdates(isManual: true)
-    }
-
-    @objc private func openBuyMeACoffee() {
-        if let url = URL(string: "https://buymeacoffee.com/bwya77") {
-            NSWorkspace.shared.open(url)
-        }
     }
 
     @objc private func openFeedback() {
