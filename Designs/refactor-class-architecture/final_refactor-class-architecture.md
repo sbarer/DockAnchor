@@ -342,26 +342,26 @@ DockAnchorTests/
 - **Testable when:** app launches, menu bar icon appears, Start Protection works
 
 **Phase 4: View decomposition** `[Phase total: ~30k tokens]`
-- ☐ [Parallel] 4a — `Views/Shared/CardStyle.swift`, `Views/Shared/WindowAccessor.swift` `[~2k tokens]`
-- ☐ [Parallel] 4b — `Views/Display/DisplayArrangementView.swift`, `Views/Display/DisplayRectangleView.swift` `[~5k tokens]`
-- ☐ [Parallel] 4c — `Views/Profiles/ProfileChip.swift`, `Views/Profiles/NewProfileSheet.swift`, `Views/Profiles/EditProfileSheet.swift` `[~8k tokens]`
-- ☐ [Sequential] 4d — `Views/Profiles/ProfilesSection.swift`, `Views/Main/StatusSection.swift`, `Views/Main/ControlsSection.swift`, `Views/DockSettings/DockSettingsSection.swift` `[~10k tokens]`
-- ☐ [Sequential] 4e — `Views/Settings/SettingsView.swift`; slim `ContentView.swift` to ≤ 60 lines `[~5k tokens]`
+- ☑ [Parallel] 4a — `Views/Shared/CardStyle.swift`, `Views/Shared/WindowAccessor.swift` `[~2k tokens]`
+- ☑ [Parallel] 4b — `Views/Display/DisplayArrangementView.swift`, `Views/Display/DisplayRectangleView.swift` `[~5k tokens]`
+- ☑ [Parallel] 4c — `Views/Profiles/ProfileChip.swift`, `Views/Profiles/NewProfileSheet.swift`, `Views/Profiles/EditProfileSheet.swift` `[~8k tokens]`
+- ☑ [Sequential] 4d — `Views/Profiles/ProfilesSection.swift`, `Views/Main/StatusSection.swift`, `Views/Main/ControlsSection.swift`, `Views/DockSettings/DockSettingsSection.swift` `[~10k tokens]`
+- ☑ [Sequential] 4e — `Views/Settings/SettingsView.swift`; slim `ContentView.swift` to ≤ 60 lines `[~5k tokens]`
 - **Testable when:** app builds; all panels visible; no layout regressions
 
 **Phase 5: App layer cleanup** `[Phase total: ~18k tokens]`
-- ☐ [Sequential] 5a — `App/WindowHiderDelegate.swift`, `App/WindowAccessor.swift` from `DockAnchorApp.swift` `[~3k tokens]`
-- ☐ [Sequential] 5b — `App/MenuBarManager.swift` — singleton; split `setupStatusMenu` into `buildMenu()`, `buildDisplaySubmenu()`, `buildProfilesSubmenu()`, `buildThemeSubmenu()`, `bindPublishers()` each ≤ 75 lines `[~10k tokens]`
-- ☐ [Sequential] 5c — `App/ApplicationDelegate.swift`; slim `DockAnchorApp.swift` to scene + commands only `[~5k tokens]`
+- ☑ [Sequential] 5a — `App/WindowHiderDelegate.swift`, `App/WindowAccessor.swift` from `DockAnchorApp.swift` `[~3k tokens]`
+- ☑ [Sequential] 5b — `App/MenuBarManager.swift` — singleton; split `setupStatusMenu` into `buildMenu()`, `buildDisplaySubmenu()`, `buildProfilesSubmenu()`, `buildThemeSubmenu()`, `bindPublishers()` each ≤ 75 lines `[~10k tokens]`
+- ☑ [Sequential] 5c — `App/ApplicationDelegate.swift`; slim `DockAnchorApp.swift` to scene + commands only `[~5k tokens]`
 - **Testable when:** menu bar fully functional; all Combine subscriptions live
 
 **Phase 6: Test suite** `[Phase total: ~20k tokens]`
-- ☐ [Parallel] 6a — `DockAnchorTests/Services/DisplayServiceTests.swift` — all 8 cases from Testing table `[~4k tokens]`
-- ☐ [Parallel] 6b — `DockAnchorTests/Services/DockRelocationServiceTests.swift` — all 12 cases `[~6k tokens]`
-- ☐ [Parallel] 6c — `DockAnchorTests/Services/MouseTrackingServiceTests.swift` — all 7 cases `[~4k tokens]`
-- ☐ [Parallel] 6d — `DockAnchorTests/Services/DockResizeServiceTests.swift` — all 6 cases `[~2k tokens]`
-- ☐ [Parallel] 6e — `DockAnchorTests/Settings/AppSettingsTests.swift` — all 8 cases `[~3k tokens]`
-- ☐ [Parallel] 6f — `DockAnchorTests/Models/DockProfileTests.swift` — all 3 cases `[~1k tokens]`
+- ☑ [Parallel] 6a — `DockAnchorTests/Services/DisplayServiceTests.swift` — all 8 cases from Testing table `[~4k tokens]`
+- ☑ [Parallel] 6b — `DockAnchorTests/Services/DockRelocationServiceTests.swift` — all 12 cases `[~6k tokens]`
+- ☑ [Parallel] 6c — `DockAnchorTests/Services/MouseTrackingServiceTests.swift` — all 7 cases `[~4k tokens]`
+- ☑ [Parallel] 6d — `DockAnchorTests/Services/DockResizeServiceTests.swift` — all 6 cases `[~2k tokens]`
+- ☑ [Parallel] 6e — `DockAnchorTests/Settings/AppSettingsTests.swift` — all 8 cases `[~3k tokens]`
+- ☑ [Parallel] 6f — `DockAnchorTests/Models/DockProfileTests.swift` — all 3 cases `[~1k tokens]`
 - **Testable when:** `cmd+U` passes all tests
 
 ---
