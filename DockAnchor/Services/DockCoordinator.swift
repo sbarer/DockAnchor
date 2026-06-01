@@ -159,13 +159,15 @@ class DockCoordinator: ObservableObject {
     func applyDockSettings(position: DockPosition?, tileSize: Int?) {
         guard position != nil || tileSize != nil else { return }
         if let position {
-            let pos = position
-            Task { await DockResizeService.shared.setPosition(pos) }
+            Task { await DockResizeService.shared.setPosition(position) }
             self.dockPosition = position
+            // Dock process restarts after a position change — delay relocation to let it settle
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+                self?.relocateDock()
+            }
         }
         if let tileSize {
-            let size = tileSize
-            Task { await DockResizeService.shared.setTileSize(size) }
+            Task { await DockResizeService.shared.setTileSize(tileSize) }
         }
     }
 
