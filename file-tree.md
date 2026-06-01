@@ -1,30 +1,31 @@
 ## File Tree
-_Last updated: 2026-05-26_
+_Last updated: 2026-06-01_
 
 ```
 DockAnchor/
-├── DockAnchor/                        # Main app target
-│   ├── AppSettings.swift              # User preferences and settings persistence
-│   ├── Assets.xcassets                # App icons and image assets
-│   ├── ContentView.swift              # Main SwiftUI view (menu bar UI)
-│   ├── DisplayIdentifier.swift        # Stable display identity across reconnects
-│   ├── DisplayManager.swift           # Display enumeration and management
-│   ├── DisplayTypes.swift             # Shared display-related types/models
-│   ├── DockAnchor.entitlements        # App sandbox entitlements
-│   ├── DockAnchor.xcdatamodeld/       # Core Data model (legacy/unused)
+├── DockAnchor/                             # Main app target
+│   ├── AppSettings.swift                   # User preferences, profile management, UserDefaults persistence
+│   ├── Assets.xcassets                     # App icons and image assets
+│   ├── ContentView.swift                   # Main SwiftUI UI: status, display picker, profiles, dock settings
+│   ├── DisplayIdentifier.swift             # Stable display fingerprinting (UUID + serial number)
+│   ├── DisplayManager.swift                # Display enumeration, reconfiguration callbacks, geometry helpers
+│   ├── DisplayTypes.swift                  # Shared types: DockPosition enum, DisplayInfo struct
+│   ├── DockAnchor.entitlements             # App sandbox entitlements
+│   ├── DockAnchor.xcdatamodeld/            # Core Data model (scaffolded, unused)
 │   │   └── DockAnchor.xcdatamodel
-│   ├── DockAnchorApp.swift            # App entry point, menu bar setup
-│   ├── DockMonitor.swift              # Monitors display changes, triggers relocation
-│   ├── DockRelocator.swift            # Moves the Dock to the target display/position
-│   ├── Info.plist                     # App metadata and permissions
-│   ├── MouseEventHandler.swift        # Hot corner mouse event monitoring
-│   ├── PermissionManager.swift        # Accessibility permission checks
-│   ├── Persistence.swift              # Core Data stack (legacy/unused)
-│   └── UpdateChecker.swift            # GitHub release update checker
+│   ├── DockAnchorApp.swift                 # App entry, ApplicationDelegate, MenuBarManager
+│   ├── DockMonitor.swift                   # Singleton coordinator: published state, timers, tap properties
+│   ├── DockRelocator.swift                 # Dock relocation via synthetic mouse events; 5-min position check timer
+│   ├── DockResizer.swift                   # Dock tile size read/write via AppleScript + defaults
+│   ├── Info.plist                          # App metadata and permissions
+│   ├── MouseEventHandler.swift             # CGEvent tap lifecycle, mouse blocking, hot corner watch timer
+│   ├── PermissionManager.swift             # Accessibility permission checks and 2s polling timer
+│   ├── Persistence.swift                   # Core Data stack (scaffolded, unused)
+│   └── UpdateChecker.swift                 # GitHub release update checker
 ├── DockAnchorTests/
-│   └── DockAnchorTests.swift          # Unit tests
+│   └── DockAnchorTests.swift               # Unit tests
 ├── DockAnchorUITests/
-│   ├── DockAnchorUITests.swift        # UI tests
+│   ├── DockAnchorUITests.swift             # UI tests
 │   └── DockAnchorUITestsLaunchTests.swift
 ├── Plans/
 │   └── refactor-dockmonitor-monolith.md
@@ -34,6 +35,5 @@ DockAnchor/
 │   └── DockAnchorUITests.xctest
 ├── architecture.md
 ├── CLAUDE.md
-├── file-tree.md
-└── settings.json
+└── file-tree.md
 ```
