@@ -187,7 +187,7 @@ class DockRelocationService {
 
     private func prepareEventTap() {
         if !MouseTrackingService.shared.isTracking {
-            MouseTrackingService.shared.createTemporaryTap()
+            _ = MouseTrackingService.shared.createTemporaryTap()
         }
     }
 
