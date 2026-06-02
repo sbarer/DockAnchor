@@ -9,7 +9,6 @@ struct DisplayRectangleView: View {
     @Environment(\.colorScheme) var colorScheme
     let display: DisplayInfo
     let isSelected: Bool
-    let isBlocked: Bool
     let size: CGSize
 
     var body: some View {
@@ -43,7 +42,6 @@ struct DisplayRectangleView: View {
         }
         .frame(width: size.width, height: size.height)
         .contentShape(Rectangle())
-        .opacity(isBlocked ? 0.35 : 1.0)
     }
 
     private var displayLabel: String {

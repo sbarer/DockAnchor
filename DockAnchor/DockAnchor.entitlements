@@ -10,6 +10,7 @@
 	<array>
 		<string>com.apple.systemevents</string>
 		<string>com.apple.finder</string>
+		<string>com.apple.systempreferences</string>
 	</array>
 </dict>
 </plist>

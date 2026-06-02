@@ -13,7 +13,6 @@ struct DockSettingsSection: View {
     @State private var originalDockPosition: DockPosition = .bottom
     @State private var originalDockTileSize: Double = 48
     @State private var dockChangesPending = false
-    @State private var hoveredBlockedPosition: DockPosition? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -25,10 +24,6 @@ struct DockSettingsSection: View {
         .cardStyle()
         .onAppear { initDockState() }
         .onChange(of: appSettings.activeProfileID) { _, _ in initDockState() }
-        .onChange(of: appSettings.selectedDisplayUUID) { _, _ in
-            initDockState()
-            validateAndFixPosition()
-        }
     }
 
     @ViewBuilder private var dockHeader: some View {
@@ -45,66 +40,21 @@ struct DockSettingsSection: View {
         HStack {
             Text("Position").font(.callout)
             Spacer()
-            HStack(spacing: 4) {
+            Picker("", selection: Binding(
+                get: { liveDockPosition },
+                set: { newValue in
+                    liveDockPosition = newValue
+                    dockChangesPending = true
+                    coordinator.applyDockSettings(position: newValue, tileSize: nil)
+                }
+            )) {
                 ForEach(DockPosition.allCases, id: \.self) { pos in
-                    positionButton(for: pos)
+                    Text(pos.label).tag(pos)
                 }
             }
+            .pickerStyle(.segmented)
+            .frame(width: 180)
         }
-    }
-
-    @ViewBuilder private func positionButton(for pos: DockPosition) -> some View {
-        let blocked = isEdgeBlocked(pos)
-        let isSelected = liveDockPosition == pos
-
-        Button(action: {
-            guard !blocked else { return }
-            liveDockPosition = pos
-            dockChangesPending = true
-            coordinator.applyDockSettings(position: pos, tileSize: nil)
-        }) {
-            Text(pos.label)
-                .font(.callout)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(isSelected ? Color.accentColor : Color.secondary.opacity(0.15))
-                .foregroundColor(isSelected ? .white : .primary)
-                .cornerRadius(6)
-                .opacity(blocked ? 0.4 : 1.0)
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            if hovering && blocked {
-                hoveredBlockedPosition = pos
-            } else if hoveredBlockedPosition == pos {
-                hoveredBlockedPosition = nil
-            }
-        }
-        .popover(isPresented: Binding(
-            get: { hoveredBlockedPosition == pos },
-            set: { if !$0 { hoveredBlockedPosition = nil } }
-        )) {
-            Text("The OS doesn't allow the dock here — this edge is fully shared with another display.")
-                .font(.callout)
-                .padding(10)
-                .frame(maxWidth: 220)
-        }
-    }
-
-    private func isEdgeBlocked(_ position: DockPosition) -> Bool {
-        let displays = coordinator.displays
-        guard let anchor = displays.first(where: { $0.uuid == appSettings.selectedDisplayUUID }) else { return false }
-        return anchor.isEdgeBlocked(position, in: displays)
-    }
-
-    private func validateAndFixPosition() {
-        let displays = coordinator.displays
-        guard let anchor = displays.first(where: { $0.uuid == appSettings.selectedDisplayUUID }) else { return }
-        guard anchor.isEdgeBlocked(liveDockPosition, in: displays) else { return }
-        guard let valid = [DockPosition.bottom, .left, .right].first(where: { !anchor.isEdgeBlocked($0, in: displays) }) else { return }
-        liveDockPosition = valid
-        dockChangesPending = true
-        coordinator.applyDockSettings(position: valid, tileSize: nil)
     }
 
     @ViewBuilder private var sizeRow: some View {

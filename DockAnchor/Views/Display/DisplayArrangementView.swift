@@ -16,18 +16,13 @@ struct DisplayArrangementView: View {
             ZStack(alignment: .topLeading) {
                 ForEach(displays) { display in
                     let frame = layout.scaledFrames[display.id] ?? .zero
-                    let isBlocked = !display.hasAnyValidPosition(in: displays)
                     DisplayRectangleView(
                         display: display,
                         isSelected: display.uuid == selectedDisplayUUID,
-                        isBlocked: isBlocked,
                         size: CGSize(width: frame.width, height: frame.height)
                     )
                     .offset(x: frame.minX, y: frame.minY)
-                    .onTapGesture {
-                        guard !isBlocked else { return }
-                        selectedDisplayUUID = display.uuid
-                    }
+                    .onTapGesture { selectedDisplayUUID = display.uuid }
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
