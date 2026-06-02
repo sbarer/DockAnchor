@@ -25,7 +25,7 @@ struct ContentView: View {
             DockSettingsSection()
         }
         .padding()
-        .frame(width: 420, height: 820)
+        .frame(width: 420)
         .background(.background)
         .sheet(isPresented: $showingSettings) {
             SettingsView().preferredColorScheme(appSettings.appTheme.colorScheme)
@@ -59,9 +59,9 @@ struct ContentView: View {
     }
 
     @ViewBuilder private var headerView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             Image(systemName: "dock.rectangle")
-                .font(.system(size: 48))
+                .font(.system(size: 36))
                 .foregroundColor(.accentColor)
             Text("DockAnchor")
                 .font(.largeTitle)
@@ -70,7 +70,7 @@ struct ContentView: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
-        .padding(.top)
+        .padding(.top, 4)
     }
 }
 

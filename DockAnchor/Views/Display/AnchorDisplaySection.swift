@@ -17,7 +17,7 @@ struct AnchorDisplaySection: View {
             DisplayArrangementView(
                 displays: coordinator.displays,
                 selectedDisplayUUID: $appSettings.selectedDisplayUUID,
-                maxHeight: 100
+                maxHeight: 150
             )
             .padding(.vertical, 4)
 

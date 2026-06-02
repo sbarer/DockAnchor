@@ -144,7 +144,7 @@ struct SettingsView: View {
             DisplayArrangementView(
                 displays: coordinator.displays,
                 selectedDisplayUUID: $appSettings.selectedDisplayUUID,
-                maxHeight: 60
+                maxHeight: 150
             )
             Text("\(coordinator.displays.count) display(s) detected")
                 .font(.caption).foregroundColor(.secondary)
