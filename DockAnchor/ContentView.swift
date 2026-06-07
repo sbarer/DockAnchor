@@ -20,9 +20,9 @@ struct ContentView: View {
             StatusSection(showingPermissionHelp: $showingPermissionHelp)
             ControlsSection(showingSettings: $showingSettings)
             Divider()
-            AnchorDisplaySection()
             ProfilesSection(showingNewProfile: $showingNewProfile, editingProfile: $editingProfile)
             DockSettingsSection()
+            AnchorDisplaySection()
         }
         .padding()
         .frame(width: 420)

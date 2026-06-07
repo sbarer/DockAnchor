@@ -44,7 +44,8 @@ class MenuBarManager: NSObject, ObservableObject {
         removeStatusBar()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "dock.rectangle", accessibilityDescription: "DockAnchor")
+            let symbolConfig = NSImage.SymbolConfiguration(pointSize: 17.6, weight: .regular)
+            button.image = NSImage(systemSymbolName: "dock.rectangle", accessibilityDescription: "DockAnchor")?.withSymbolConfiguration(symbolConfig)
             button.toolTip = "DockAnchor - Click to open"
             button.action = #selector(statusItemClicked)
             button.target = self
@@ -60,6 +61,13 @@ class MenuBarManager: NSObject, ObservableObject {
         guard let coordinator = coordinator, let appSettings = appSettings else { return }
 
         let menu = NSMenu()
+
+        let showItem = NSMenuItem(title: "Open DockAnchor", action: #selector(showMainWindow), keyEquivalent: "")
+        showItem.target = self
+        menu.addItem(showItem)
+
+        menu.addItem(.separator())
+
         let statusMenuItem = NSMenuItem()
         updateStatusMenuItem(statusMenuItem, isActive: coordinator.isActive)
         statusMenuItem.isEnabled = false
@@ -148,12 +156,6 @@ class MenuBarManager: NSObject, ObservableObject {
         let feedbackItem = NSMenuItem(title: "Feedback & Issues", action: #selector(openFeedback), keyEquivalent: "")
         feedbackItem.target = self
         menu.addItem(feedbackItem)
-
-        let showItem = NSMenuItem(title: "Show DockAnchor", action: #selector(showMainWindow), keyEquivalent: "")
-        showItem.target = self
-        menu.addItem(showItem)
-
-        menu.addItem(.separator())
 
         let quitItem = NSMenuItem(title: "Quit DockAnchor", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self

@@ -14,22 +14,32 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
 
+        print("[AppDelegate] applicationDidFinishLaunching: AXTrusted=\(AXIsProcessTrusted()) runInBackground=\(appSettings.runInBackground) autoRelocate=\(appSettings.autoRelocateDock) selectedDisplayUUID=\(appSettings.selectedDisplayUUID)")
+
         NotificationCenter.default.addObserver(
             self, selector: #selector(updateDockVisibility), name: .dockVisibilityChanged, object: nil
         )
         menuBarManager.setup(appSettings: appSettings, coordinator: coordinator, updateChecker: updateChecker)
         updateActivationPolicy()
 
-        guard PermissionService.shared.check() else { return }
+        guard PermissionService.shared.check() else {
+            print("[AppDelegate] applicationDidFinishLaunching: AX permission not granted — skipping monitoring setup")
+            return
+        }
         coordinator.changeAnchorDisplay(toUUID: appSettings.selectedDisplayUUID)
 
         if appSettings.runInBackground {
+            print("[AppDelegate] applicationDidFinishLaunching: scheduling startMonitoring in 1.0s")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                print("[AppDelegate] startMonitoring: firing")
                 self?.coordinator.startMonitoring()
             }
+        } else {
+            print("[AppDelegate] applicationDidFinishLaunching: runInBackground=false — monitoring NOT auto-started")
         }
         if appSettings.autoRelocateDock {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                print("[AppDelegate] autoRelocateDock: firing relocateDock")
                 self?.coordinator.relocateDock()
             }
         }

@@ -17,6 +17,7 @@ struct DockSettingsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             dockHeader
+            if appSettings.activeProfile != nil { autoActivateRow }
             positionRow
             sizeRow
             if dockChangesPending { pendingActionsRow }
@@ -33,6 +34,25 @@ struct DockSettingsSection: View {
                 Text("· \(profile.name)").font(.callout).foregroundColor(.secondary)
             }
             Spacer()
+        }
+    }
+
+    @ViewBuilder private var autoActivateRow: some View {
+        if let profile = appSettings.activeProfile {
+            HStack {
+                Text("Auto-activate when display connects").font(.callout)
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { profile.autoActivate },
+                    set: { newValue in
+                        var updated = profile
+                        updated.autoActivate = newValue
+                        appSettings.updateProfile(updated)
+                    }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
+            }
         }
     }
 

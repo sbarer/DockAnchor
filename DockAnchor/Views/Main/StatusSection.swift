@@ -28,7 +28,7 @@ struct StatusSection: View {
     }
 
     @ViewBuilder private var statusRow: some View {
-        HStack {
+        HStack(alignment: .top) {
             if coordinator.statusMessage.contains("Blocked") {
                 Image(systemName: "hand.raised.fill")
                     .foregroundColor(.red)
@@ -37,11 +37,19 @@ struct StatusSection: View {
                 Circle()
                     .fill(coordinator.isActive ? Color.green : Color.red)
                     .frame(width: 12, height: 12)
+                    .padding(.top, 3)
             }
-            Text(coordinator.statusMessage)
-                .font(.headline)
-                .foregroundColor(statusColor)
-            Spacer()
+            ZStack(alignment: .topLeading) {
+                Text("A\nA")
+                    .font(.headline)
+                    .opacity(0)
+                Text(coordinator.statusMessage)
+                    .font(.headline)
+                    .foregroundColor(statusColor)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

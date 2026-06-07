@@ -15,6 +15,7 @@ class DockRelocationService {
 
     // Set by DockCoordinator (Phase 3)
     var onStatusMessage: ((String) -> Void)?
+    var onRelocationComplete: (() -> Void)?
 
     private init() {}
 
@@ -50,8 +51,10 @@ class DockRelocationService {
                 DispatchQueue.main.sync { NSCursor.hide() }
 
                 let source = CGEventSource(stateID: .hidSystemState)
-                let approachPoint = self.pastEdgePoint(for: display, dockPosition: dockPosition)
-                let edgePoint = self.triggerPoint(for: display, dockPosition: dockPosition)
+                // Use physical dock position so sweep goes to the correct edge even if stored dockPosition is stale
+                let effectivePosition = self.detectDockState()?.position ?? dockPosition
+                let approachPoint = self.pastEdgePoint(for: display, dockPosition: effectivePosition)
+                let edgePoint = self.triggerPoint(for: display, dockPosition: effectivePosition)
 
                 print("[DockRelocationService] relocate: sweep \(approachPoint) → \(edgePoint)")
 
@@ -65,6 +68,7 @@ class DockRelocationService {
                 DispatchQueue.main.sync { NSCursor.unhide() }
 
                 DispatchQueue.main.async { [weak self] in
+                    self?.onRelocationComplete?()
                     self?.onStatusMessage?("Dock relocated to \(display.name)")
                 }
 
@@ -73,9 +77,28 @@ class DockRelocationService {
         }
     }
 
+    func detectDockState() -> (displayID: CGDirectDisplayID, position: DockPosition)? {
+        let key = NSDeviceDescriptionKey("NSScreenNumber")
+        for screen in NSScreen.screens {
+            guard let displayID = screen.deviceDescription[key] as? CGDirectDisplayID else { continue }
+            let f = screen.frame
+            let vf = screen.visibleFrame
+            // Threshold > 5px avoids rounding artifacts; menu bar only insets maxY (top)
+            if vf.minY - f.minY > 5 { return (displayID, .bottom) }
+            if vf.minX - f.minX > 5 { return (displayID, .left) }
+            if f.maxX - vf.maxX > 5 { return (displayID, .right) }
+        }
+        return nil
+    }
+
     func isDockOnDisplay(_ display: DisplayInfo, dockPosition: DockPosition) -> Bool {
         let displays = DisplayService.shared.displays
         guard displays.count > 1 else { return true }
+        if let state = detectDockState() {
+            let result = state.displayID == display.id
+            print("[DockRelocationService] isDockOnDisplay: detectedID=\(state.displayID) displayID=\(display.id) match=\(result)")
+            return result
+        }
         guard let currentID = currentDockDisplayID(dockPosition: dockPosition) else {
             print("[DockRelocationService] isDockOnDisplay: currentDockDisplayID returned nil")
             return false

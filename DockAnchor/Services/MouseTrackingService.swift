@@ -25,25 +25,33 @@ class MouseTrackingService {
     // MARK: - Public API
 
     func startTracking() -> Bool {
+        print("[MouseTrackingService] startTracking: called — AXTrusted=\(AXIsProcessTrusted()) isTracking=\(isTracking)")
         guard AXIsProcessTrusted() else {
+            print("[MouseTrackingService] startTracking: FAILED — not AX trusted")
             onStatusMessage?("Please grant accessibility permissions in System Preferences")
             return false
         }
 
-        guard !isTracking else { return true }
+        guard !isTracking else {
+            print("[MouseTrackingService] startTracking: already tracking, skipping")
+            return true
+        }
 
         installEventTap()
 
         guard eventTap != nil else {
+            print("[MouseTrackingService] startTracking: FAILED — eventTap is nil after install")
             onStatusMessage?("Permission needs reset - remove and re-add app in Accessibility settings")
             return false
         }
 
         isTracking = true
+        print("[MouseTrackingService] startTracking: SUCCESS — tap installed, isTracking=true")
         return true
     }
 
     func stopTracking() {
+        print("[MouseTrackingService] stopTracking: isTracking=\(isTracking)")
         guard isTracking else { return }
 
         isTracking = false
@@ -57,9 +65,11 @@ class MouseTrackingService {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
             runLoopSource = nil
         }
+        print("[MouseTrackingService] stopTracking: done")
     }
 
     func createTemporaryTap() -> Bool {
+        print("[MouseTrackingService] createTemporaryTap: called — eventTap exists=\(eventTap != nil)")
         guard eventTap == nil else { return false }
 
         let eventMask = CGEventMask(1 << CGEventType.mouseMoved.rawValue)
@@ -76,16 +86,20 @@ class MouseTrackingService {
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         )
 
-        guard let tap = eventTap else { return false }
+        guard let tap = eventTap else {
+            print("[MouseTrackingService] createTemporaryTap: FAILED — tapCreate returned nil")
+            return false
+        }
 
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-
+        print("[MouseTrackingService] createTemporaryTap: SUCCESS")
         return true
     }
 
     func removeTemporaryTap() {
+        print("[MouseTrackingService] removeTemporaryTap: isTracking=\(isTracking)")
         guard !isTracking else { return }
 
         if let tap = eventTap {
@@ -110,14 +124,14 @@ class MouseTrackingService {
         let dockPosition = DockCoordinator.shared.dockPosition
         switch dockPosition {
         case .bottom:
-            return CGRect(x: display.frame.minX, y: display.frame.maxY - 10,
-                          width: display.frame.width, height: 10)
+            return CGRect(x: display.frame.minX, y: display.frame.maxY - 15,
+                          width: display.frame.width, height: 15)
         case .left:
             return CGRect(x: display.frame.minX, y: display.frame.minY,
-                          width: 10, height: display.frame.height)
+                          width: 15, height: display.frame.height)
         case .right:
-            return CGRect(x: display.frame.maxX - 10, y: display.frame.minY,
-                          width: 10, height: display.frame.height)
+            return CGRect(x: display.frame.maxX - 15, y: display.frame.minY,
+                          width: 15, height: display.frame.height)
         }
     }
 
@@ -143,32 +157,49 @@ class MouseTrackingService {
     }
 
     func shouldBlock(at location: CGPoint) -> Bool {
+        guard DockCoordinator.shared.isDockAnchored else { return false }
         let anchorID = DockCoordinator.shared.anchorDisplayID
-        for display in DisplayService.shared.displays {
-            if display.id == anchorID { continue }
+        let allDisplays = DisplayService.shared.displays
 
-            if AppSettings.shared.isHotCornersPreserved(forDisplayUUID: display.uuid) &&
-               isInCornerZone(location, display: display) {
-                onHotCornerDetected?()
-                return false
-            }
-
-            if triggerZone(for: display).contains(location) {
-                DispatchQueue.main.async { [weak self] in
-                    self?.onStatusMessage?("Blocked dock movement attempt to \(display.name)")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                        self?.onStatusMessage?("Dock Anchor Active - Monitoring mouse movement")
-                    }
-                }
-                return true
-            }
+        guard let currentDisplay = allDisplays.first(where: { $0.frame.contains(location) }) else {
+            return false
         }
+
+        guard currentDisplay.id != anchorID else {
+            return false
+        }
+
+        let zone = triggerZone(for: currentDisplay)
+        if (location.x < 25 || location.x > zone.maxX - 25 || location.y > zone.maxY - 25) {
+            print("[MouseTrackingService::shouldBlock] \(currentDisplay.name) loc=\(location) triggerZone=\(zone) dockPos=\(DockCoordinator.shared.dockPosition)")
+        }
+
+
+        if AppSettings.shared.isHotCornersPreserved(forDisplayUUID: currentDisplay.uuid) &&
+           isInCornerZone(location, display: currentDisplay) {
+            print("[MouseTrackingService::shouldBlock]  hot corner — allowing through")
+            onHotCornerDetected?()
+            return false
+        }
+
+        if zone.contains(location) {
+            print("[MouseTrackingService::shouldBlock] BLOCKING at \(currentDisplay.name)")
+            DispatchQueue.main.async { [weak self] in
+                self?.onStatusMessage?("Blocked dock movement attempt to \(currentDisplay.name)")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                    self?.onStatusMessage?("Dock Anchor Active - Monitoring mouse movement")
+                }
+            }
+            return true
+        }
+
         return false
     }
 
     // MARK: - Private
 
     private func installEventTap() {
+        print("[MouseTrackingService] installEventTap: installing on thread=\(Thread.isMainThread ? "main" : "bg") runLoop=\(CFRunLoopGetCurrent() == CFRunLoopGetMain() ? "main" : "other")")
         let eventMask = CGEventMask(
             (1 << CGEventType.mouseMoved.rawValue) |
             (1 << CGEventType.tapDisabledByTimeout.rawValue) |
@@ -196,11 +227,15 @@ class MouseTrackingService {
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         )
 
-        guard let tap = eventTap else { return }
+        guard let tap = eventTap else {
+            print("[MouseTrackingService] installEventTap: FAILED — tapCreate returned nil (AXTrusted=\(AXIsProcessTrusted()))")
+            return
+        }
 
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        print("[MouseTrackingService] installEventTap: SUCCESS — tap=\(tap)")
     }
 
     private func handleMouseEvent(
