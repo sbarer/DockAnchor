@@ -136,7 +136,7 @@ class UpdateChecker: ObservableObject {
     private func showNoUpdateNotification() {
         let alert = NSAlert()
         alert.messageText = "No Updates Available"
-        alert.informativeText = "You are already running the latest version of DockAnchor (\(currentVersion))."
+        alert.informativeText = "You are already running the latest version of Dock Anchor Deluxe (\(currentVersion))."
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()

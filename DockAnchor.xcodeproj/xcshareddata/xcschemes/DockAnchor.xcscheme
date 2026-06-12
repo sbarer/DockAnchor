@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "49C873122E15BF5100F73B78"
-               BuildableName = "DockAnchor.app"
-               BlueprintName = "DockAnchor"
+               BuildableName = "DockAnchorDeluxe.app"
+               BlueprintName = "DockAnchorDeluxe"
                ReferencedContainer = "container:DockAnchor.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -70,8 +70,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "49C873122E15BF5100F73B78"
-            BuildableName = "DockAnchor.app"
-            BlueprintName = "DockAnchor"
+            BuildableName = "DockAnchorDeluxe.app"
+            BlueprintName = "DockAnchorDeluxe"
             ReferencedContainer = "container:DockAnchor.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -87,8 +87,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "49C873122E15BF5100F73B78"
-            BuildableName = "DockAnchor.app"
-            BlueprintName = "DockAnchor"
+            BuildableName = "DockAnchorDeluxe.app"
+            BlueprintName = "DockAnchorDeluxe"
             ReferencedContainer = "container:DockAnchor.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

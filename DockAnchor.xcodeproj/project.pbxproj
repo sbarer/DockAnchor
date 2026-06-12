@@ -24,7 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		49C873132E15BF5100F73B78 /* DockAnchor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockAnchor.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		49C873132E15BF5100F73B78 /* DockAnchorDeluxe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DockAnchorDeluxe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		49C873262E15BF5300F73B78 /* DockAnchorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockAnchorTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		49C873302E15BF5300F73B78 /* DockAnchorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockAnchorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -85,7 +85,7 @@
 		49C873142E15BF5100F73B78 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				49C873132E15BF5100F73B78 /* DockAnchor.app */,
+				49C873132E15BF5100F73B78 /* DockAnchorDeluxe.app */,
 				49C873262E15BF5300F73B78 /* DockAnchorTests.xctest */,
 				49C873302E15BF5300F73B78 /* DockAnchorUITests.xctest */,
 			);
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		49C873122E15BF5100F73B78 /* DockAnchor */ = {
+		49C873122E15BF5100F73B78 /* DockAnchorDeluxe */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 49C8733A2E15BF5300F73B78 /* Build configuration list for PBXNativeTarget "DockAnchor" */;
+			buildConfigurationList = 49C8733A2E15BF5300F73B78 /* Build configuration list for PBXNativeTarget "DockAnchorDeluxe" */;
 			buildPhases = (
 				49C8730F2E15BF5100F73B78 /* Sources */,
 				49C873102E15BF5100F73B78 /* Frameworks */,
@@ -110,11 +110,11 @@
 			fileSystemSynchronizedGroups = (
 				49C873152E15BF5100F73B78 /* DockAnchor */,
 			);
-			name = DockAnchor;
+			name = DockAnchorDeluxe;
 			packageProductDependencies = (
 			);
 			productName = DockAnchor;
-			productReference = 49C873132E15BF5100F73B78 /* DockAnchor.app */;
+			productReference = 49C873132E15BF5100F73B78 /* DockAnchorDeluxe.app */;
 			productType = "com.apple.product-type.application";
 		};
 		49C873252E15BF5300F73B78 /* DockAnchorTests */ = {
@@ -200,7 +200,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				49C873122E15BF5100F73B78 /* DockAnchor */,
+				49C873122E15BF5100F73B78 /* DockAnchorDeluxe */,
 				49C873252E15BF5300F73B78 /* DockAnchorTests */,
 				49C8732F2E15BF5300F73B78 /* DockAnchorUITests */,
 			);
@@ -258,12 +258,12 @@
 /* Begin PBXTargetDependency section */
 		49C873282E15BF5300F73B78 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 49C873122E15BF5100F73B78 /* DockAnchor */;
+			target = 49C873122E15BF5100F73B78 /* DockAnchorDeluxe */;
 			targetProxy = 49C873272E15BF5300F73B78 /* PBXContainerItemProxy */;
 		};
 		49C873322E15BF5300F73B78 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 49C873122E15BF5100F73B78 /* DockAnchor */;
+			target = 49C873122E15BF5100F73B78 /* DockAnchorDeluxe */;
 			targetProxy = 49C873312E15BF5300F73B78 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -403,7 +403,7 @@
 				CODE_SIGN_ENTITLEMENTS = DockAnchor/DockAnchor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.0.1;
+				CURRENT_PROJECT_VERSION = 3.0;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = PR8S22J285;
 				ENABLE_APP_SANDBOX = YES;
@@ -412,7 +412,7 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DockAnchor/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = DockAnchor;
+				INFOPLIST_KEY_CFBundleDisplayName = DockAnchorDeluxe;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app requires permission to automate System Events and Finder for file management.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -420,8 +420,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = bwyatt.DockAnchor;
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sbarer.DockAnchorDeluxe;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -439,7 +439,7 @@
 				CODE_SIGN_ENTITLEMENTS = DockAnchor/DockAnchor.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2.0.1;
+				CURRENT_PROJECT_VERSION = 3.0;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = PR8S22J285;
 				ENABLE_APP_SANDBOX = YES;
@@ -448,7 +448,7 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DockAnchor/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = DockAnchor;
+				INFOPLIST_KEY_CFBundleDisplayName = DockAnchorDeluxe;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app requires permission to automate System Events and Finder for file management.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -456,8 +456,8 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 2.0.1;
-				PRODUCT_BUNDLE_IDENTIFIER = bwyatt.DockAnchor;
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = sbarer.DockAnchorDeluxe;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -549,7 +549,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		49C8733A2E15BF5300F73B78 /* Build configuration list for PBXNativeTarget "DockAnchor" */ = {
+		49C8733A2E15BF5300F73B78 /* Build configuration list for PBXNativeTarget "DockAnchorDeluxe" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				49C8733B2E15BF5300F73B78 /* Debug */,

@@ -45,8 +45,8 @@ class MenuBarManager: NSObject, ObservableObject {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
             let symbolConfig = NSImage.SymbolConfiguration(pointSize: 17.6, weight: .regular)
-            button.image = NSImage(systemSymbolName: "dock.rectangle", accessibilityDescription: "DockAnchor")?.withSymbolConfiguration(symbolConfig)
-            button.toolTip = "DockAnchor - Click to open"
+            button.image = NSImage(systemSymbolName: "dock.rectangle", accessibilityDescription: "Dock Anchor Deluxe")?.withSymbolConfiguration(symbolConfig)
+            button.toolTip = "Dock Anchor Deluxe - Click to open"
             button.action = #selector(statusItemClicked)
             button.target = self
         }
@@ -62,7 +62,7 @@ class MenuBarManager: NSObject, ObservableObject {
 
         let menu = NSMenu()
 
-        let showItem = NSMenuItem(title: "Open DockAnchor", action: #selector(showMainWindow), keyEquivalent: "")
+        let showItem = NSMenuItem(title: "Open Dock Anchor Deluxe", action: #selector(showMainWindow), keyEquivalent: "")
         showItem.target = self
         menu.addItem(showItem)
 
@@ -149,6 +149,10 @@ class MenuBarManager: NSObject, ObservableObject {
     }
 
     private func addUtilityItems(to menu: NSMenu) {
+        let showInFinderItem = NSMenuItem(title: "Show in Finder", action: #selector(showInFinder), keyEquivalent: "")
+        showInFinderItem.target = self
+        menu.addItem(showInFinderItem)
+
         let updateItem = NSMenuItem(title: "Check for Updates", action: #selector(checkForUpdates), keyEquivalent: "")
         updateItem.target = self
         menu.addItem(updateItem)
@@ -157,7 +161,7 @@ class MenuBarManager: NSObject, ObservableObject {
         feedbackItem.target = self
         menu.addItem(feedbackItem)
 
-        let quitItem = NSMenuItem(title: "Quit DockAnchor", action: #selector(quitApp), keyEquivalent: "q")
+        let quitItem = NSMenuItem(title: "Quit Dock Anchor Deluxe", action: #selector(quitApp), keyEquivalent: "q")
         quitItem.target = self
         menu.addItem(quitItem)
     }
@@ -174,7 +178,7 @@ class MenuBarManager: NSObject, ObservableObject {
         }.store(in: &cancellables)
 
         coordinator.$statusMessage.receive(on: DispatchQueue.main).sink { [weak self] msg in
-            self?.statusItem?.button?.toolTip = "DockAnchor - \(msg)"
+            self?.statusItem?.button?.toolTip = "Dock Anchor Deluxe - \(msg)"
         }.store(in: &cancellables)
 
         coordinator.$displays.receive(on: DispatchQueue.main).sink { [weak self] _ in
@@ -264,6 +268,10 @@ class MenuBarManager: NSObject, ObservableObject {
         refreshProfilesSubmenu()
     }
 
+    @objc private func showInFinder() {
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
+    }
+
     @objc private func checkForUpdates() { updateChecker?.checkForUpdates(isManual: true) }
 
     @objc private func openFeedback() {
@@ -272,20 +280,22 @@ class MenuBarManager: NSObject, ObservableObject {
 
     @objc func showMainWindow() {
         if !(appSettings?.hideFromDock ?? false) { NSApp.setActivationPolicy(.regular) }
-        NSApp.activate(ignoringOtherApps: true)
-        DistributedNotificationCenter.default().post(name: NSNotification.Name("com.apple.dock.refresh"), object: nil)
 
-        for window in NSApp.windows where window.level == .normal && window.frame.width > 100 && window.frame.height > 100 {
-            window.makeKeyAndOrderFront(nil)
+        DispatchQueue.main.async {
             NSApp.activate(ignoringOtherApps: true)
-            return
-        }
+            DistributedNotificationCenter.default().post(name: NSNotification.Name("com.apple.dock.refresh"), object: nil)
 
-        NotificationCenter.default.post(name: .showMainWindowRequested, object: nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            NSApp.activate(ignoringOtherApps: true)
-            for window in NSApp.windows where window.level == .normal && window.frame.width > 100 {
-                window.makeKeyAndOrderFront(nil); break
+            for window in NSApp.windows where window.level == .normal && window.frame.width > 100 && window.frame.height > 100 {
+                window.makeKeyAndOrderFront(nil)
+                return
+            }
+
+            NotificationCenter.default.post(name: .showMainWindowRequested, object: nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                NSApp.activate(ignoringOtherApps: true)
+                for window in NSApp.windows where window.level == .normal && window.frame.width > 100 {
+                    window.makeKeyAndOrderFront(nil); break
+                }
             }
         }
     }

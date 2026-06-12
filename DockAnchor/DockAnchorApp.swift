@@ -19,7 +19,7 @@ struct DockAnchorApp: App {
     private let windowHiderDelegate = WindowHiderDelegate()
 
     var body: some Scene {
-        WindowGroup("DockAnchor") {
+        WindowGroup("Dock Anchor Deluxe") {
             ContentView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environmentObject(appSettings)
@@ -39,7 +39,7 @@ struct DockAnchorApp: App {
         .handlesExternalEvents(matching: Set(arrayLiteral: "main"))
         .commands {
             CommandGroup(after: .appInfo) {
-                Button("Show DockAnchor") { menuBarManager.showMainWindow() }
+                Button("Show Dock Anchor Deluxe") { menuBarManager.showMainWindow() }
                     .keyboardShortcut("d", modifiers: [.command, .option])
                 Divider()
                 Button(coordinator.isActive ? "Stop Protection" : "Start Protection") {

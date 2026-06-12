@@ -13,7 +13,7 @@ class DockCoordinator: ObservableObject {
 
     // MARK: - Published
     @Published private(set) var isActive: Bool = false
-    @Published private(set) var statusMessage: String = "Dock Anchor Ready"
+    @Published private(set) var statusMessage: String = "Dock Anchor Deluxe Ready"
     @Published private(set) var anchoredDisplayName: String = "Primary"
     @Published private(set) var needsPermissionReset: Bool = false
     @Published private(set) var displays: [DisplayInfo] = []
@@ -150,10 +150,10 @@ class DockCoordinator: ObservableObject {
             print("[DockCoordinator] startMonitoring: FAILED — startTracking returned false")
             return
         }
-        PermissionService.shared.startPolling(interval: 2.0)
+        PermissionService.shared.startPolling(interval: 5.0)
         startPositionCheckTimer()
         isActive = true
-        statusMessage = "Dock Anchor Active - Monitoring mouse movement"
+        statusMessage = "Dock Anchor Deluxe Active - Monitoring mouse movement"
         print("[DockCoordinator] startMonitoring: SUCCESS — isActive=true")
     }
 
@@ -163,7 +163,7 @@ class DockCoordinator: ObservableObject {
         stopPositionCheckTimer()
         MouseTrackingService.shared.stopTracking()
         isActive = false
-        statusMessage = "Dock Anchor Stopped"
+        statusMessage = "Dock Anchor Deluxe Stopped"
     }
 
     // MARK: - Anchor display
@@ -232,7 +232,7 @@ class DockCoordinator: ObservableObject {
         if !profileActivated {
             handleDisplayAddedNoProfile(info: info)
         }
-        postStatus(isActive ? "Dock Anchor Active - Monitoring mouse movement" : "Dock Anchor Ready")
+        postStatus(isActive ? "Dock Anchor Deluxe Active - Monitoring mouse movement" : "Dock Anchor Deluxe Ready")
     }
 
     private func activateProfileIfNeeded(for uuid: String) -> Bool {
@@ -309,7 +309,7 @@ class DockCoordinator: ObservableObject {
                 self?.relocateDock()
             }
         }
-        postStatus(isActive ? "Dock Anchor Active - Monitoring mouse movement" : "Dock Anchor Ready")
+        postStatus(isActive ? "Dock Anchor Deluxe Active - Monitoring mouse movement" : "Dock Anchor Deluxe Ready")
     }
 
     // MARK: - Permission
@@ -433,8 +433,8 @@ class DockCoordinator: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + resetAfter) { [weak self] in
                 guard let self else { return }
                 self.statusMessage = self.isActive
-                    ? "Dock Anchor Active - Monitoring mouse movement"
-                    : "Dock Anchor Ready"
+                    ? "Dock Anchor Deluxe Active - Monitoring mouse movement"
+                    : "Dock Anchor Deluxe Ready"
             }
         }
     }

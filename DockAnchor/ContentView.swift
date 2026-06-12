@@ -63,7 +63,7 @@ struct ContentView: View {
             Image(systemName: "dock.rectangle")
                 .font(.system(size: 36))
                 .foregroundColor(.accentColor)
-            Text("DockAnchor")
+            Text("Dock Anchor Deluxe")
                 .font(.largeTitle)
                 .fontWeight(.bold)
             Text("Keep your dock anchored to one display")

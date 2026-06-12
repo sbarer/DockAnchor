@@ -170,10 +170,6 @@ class MouseTrackingService {
         }
 
         let zone = triggerZone(for: currentDisplay)
-        if (location.x < 25 || location.x > zone.maxX - 25 || location.y > zone.maxY - 25) {
-            print("[MouseTrackingService::shouldBlock] \(currentDisplay.name) loc=\(location) triggerZone=\(zone) dockPos=\(DockCoordinator.shared.dockPosition)")
-        }
-
 
         if AppSettings.shared.isHotCornersPreserved(forDisplayUUID: currentDisplay.uuid) &&
            isInCornerZone(location, display: currentDisplay) {
@@ -187,7 +183,7 @@ class MouseTrackingService {
             DispatchQueue.main.async { [weak self] in
                 self?.onStatusMessage?("Blocked dock movement attempt to \(currentDisplay.name)")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                    self?.onStatusMessage?("Dock Anchor Active - Monitoring mouse movement")
+                    self?.onStatusMessage?("Dock Anchor Deluxe Active - Monitoring mouse movement")
                 }
             }
             return true
