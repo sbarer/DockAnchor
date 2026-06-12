@@ -29,9 +29,22 @@
 		49C873302E15BF5300F73B78 /* DockAnchorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DockAnchorUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		58F0D2282FDB939F00F3190A /* Exceptions for "DockAnchor" folder in "DockAnchorDeluxe" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 49C873122E15BF5100F73B78 /* DockAnchorDeluxe */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		49C873152E15BF5100F73B78 /* DockAnchor */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				58F0D2282FDB939F00F3190A /* Exceptions for "DockAnchor" folder in "DockAnchorDeluxe" target */,
+			);
 			path = DockAnchor;
 			sourceTree = "<group>";
 		};
@@ -171,7 +184,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1640;
-				LastUpgradeCheck = 2600;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					49C873122E15BF5100F73B78 = {
 						CreatedOnToolsVersion = 16.4;
@@ -411,7 +424,6 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = DockAnchor/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DockAnchorDeluxe;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app requires permission to automate System Events and Finder for file management.";
@@ -447,7 +459,6 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = DockAnchor/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DockAnchorDeluxe;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "This app requires permission to automate System Events and Finder for file management.";

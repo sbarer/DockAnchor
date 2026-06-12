@@ -8,7 +8,7 @@ import Cocoa
 import ApplicationServices
 import CoreGraphics
 
-class DockRelocationService {
+class DockRelocationService: @unchecked Sendable {
     static let shared = DockRelocationService()
 
     private(set) var isRelocating: Bool = false
