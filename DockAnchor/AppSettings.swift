@@ -303,17 +303,8 @@ class AppSettings: ObservableObject {
         }
     }
 
-    /// Extracts the base UUID portion from a fingerprint (removes -SN or -V suffixes)
     func extractBaseUUID(from fingerprint: String) -> String {
-        // Check for -SN suffix (serial number)
-        if let snRange = fingerprint.range(of: "-SN") {
-            return String(fingerprint[..<snRange.lowerBound])
-        }
-        // Check for -V suffix (vendor/model)
-        if let vRange = fingerprint.range(of: "-V") {
-            return String(fingerprint[..<vRange.lowerBound])
-        }
-        return fingerprint
+        DisplayService.shared.baseUUID(from: fingerprint)
     }
 
     // MARK: - Profile Persistence
