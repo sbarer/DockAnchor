@@ -33,7 +33,9 @@
 		58F0D2282FDB939F00F3190A /* Exceptions for "DockAnchor" folder in "DockAnchorDeluxe" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				architecture.md,
+				CLAUDE.md,
+				"file-tree.md",
 			);
 			target = 49C873122E15BF5100F73B78 /* DockAnchorDeluxe */;
 		};

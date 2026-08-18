@@ -10,9 +10,7 @@ struct DockSettingsSection: View {
     @EnvironmentObject var appSettings: AppSettings
     @State private var liveDockPosition: DockPosition = .bottom
     @State private var liveDockTileSize: Double = 48
-    @State private var originalDockPosition: DockPosition = .bottom
-    @State private var originalDockTileSize: Double = 48
-    @State private var dockChangesPending = false
+    @State private var showingHotCorners = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -20,7 +18,7 @@ struct DockSettingsSection: View {
             if appSettings.activeProfile != nil { autoActivateRow }
             positionRow
             sizeRow
-            if dockChangesPending { pendingActionsRow }
+            hotCornersRow
         }
         .cardStyle()
         .onAppear { initDockState() }
@@ -64,8 +62,8 @@ struct DockSettingsSection: View {
                 get: { liveDockPosition },
                 set: { newValue in
                     liveDockPosition = newValue
-                    dockChangesPending = true
                     coordinator.applyDockSettings(position: newValue, tileSize: nil)
+                    saveToActiveProfileIfNeeded()
                 }
             )) {
                 ForEach(DockPosition.allCases, id: \.self) { pos in
@@ -88,26 +86,38 @@ struct DockSettingsSection: View {
         }
         Slider(value: $liveDockTileSize, in: 5...55, step: 5) { editing in
             if !editing {
-                dockChangesPending = true
                 coordinator.applyDockSettings(position: nil, tileSize: Int(liveDockTileSize))
+                saveToActiveProfileIfNeeded()
             }
         }
     }
 
-    @ViewBuilder private var pendingActionsRow: some View {
+    @ViewBuilder private var hotCornersRow: some View {
         HStack {
-            Button("Revert") {
-                liveDockPosition = originalDockPosition
-                liveDockTileSize = originalDockTileSize
-                coordinator.applyDockSettings(position: originalDockPosition, tileSize: Int(originalDockTileSize))
-                dockChangesPending = false
-            }
-            .buttonStyle(.bordered)
+            Text("Hot Corners").font(.callout)
             Spacer()
-            if appSettings.activeProfile != nil {
-                Button("Save to Profile") { saveDockSettingsToActiveProfile() }
-                    .buttonStyle(.borderedProminent)
-            }
+            Button("Customize") { showingHotCorners = true }
+                .buttonStyle(.bordered)
+                .popover(isPresented: $showingHotCorners, arrowEdge: .trailing) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Hot Corners").font(.headline)
+                        Text("Corner areas are excluded from edge blocking so macOS hot corners still fire.")
+                            .font(.caption).foregroundColor(.secondary)
+                        ForEach(coordinator.displays) { display in
+                            HStack {
+                                Text(display.name).font(.callout)
+                                Spacer()
+                                Toggle("", isOn: Binding(
+                                    get: { appSettings.isHotCornersPreserved(forDisplayUUID: display.uuid) },
+                                    set: { appSettings.setHotCornersPreserved($0, forDisplayUUID: display.uuid) }
+                                ))
+                                .toggleStyle(.switch).labelsHidden().controlSize(.small)
+                            }
+                        }
+                    }
+                    .padding()
+                    .frame(minWidth: 280)
+                }
         }
     }
 
@@ -121,18 +131,12 @@ struct DockSettingsSection: View {
             liveDockPosition = systemPosition
             liveDockTileSize = systemSize
         }
-        originalDockPosition = liveDockPosition
-        originalDockTileSize = liveDockTileSize
-        dockChangesPending = false
     }
 
-    private func saveDockSettingsToActiveProfile() {
+    private func saveToActiveProfileIfNeeded() {
         guard var profile = appSettings.activeProfile else { return }
         profile.dockPosition = liveDockPosition
         profile.dockTileSize = Int(liveDockTileSize)
         appSettings.updateProfile(profile)
-        originalDockPosition = liveDockPosition
-        originalDockTileSize = liveDockTileSize
-        dockChangesPending = false
     }
 }

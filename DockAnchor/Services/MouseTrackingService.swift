@@ -18,7 +18,7 @@ class MouseTrackingService {
     var onHotCornerDetected: (() -> Void)?
     var onStatusMessage: ((String) -> Void)?
 
-    let cornerZoneSize: CGFloat = 60
+    let cornerZoneSize: CGFloat = 15
 
     private init() {}
 
@@ -32,9 +32,16 @@ class MouseTrackingService {
             return false
         }
 
-        guard !isTracking else {
-            print("[MouseTrackingService] startTracking: already tracking, skipping")
-            return true
+        if isTracking {
+            if isEventTapValid() {
+                print("[MouseTrackingService] startTracking: already tracking with valid tap, skipping")
+                return true
+            }
+            // Tap was invalidated (e.g. wake from sleep) — force reset before reinstalling
+            print("[MouseTrackingService] startTracking: tap invalid despite isTracking=true, resetting")
+            isTracking = false
+            eventTap = nil
+            runLoopSource = nil
         }
 
         installEventTap()

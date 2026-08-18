@@ -9,6 +9,7 @@ struct DockProfile: Identifiable, Codable, Equatable {
     var autoActivate: Bool
     var dockPosition: DockPosition?
     var dockTileSize: Int?
+    var hotCornersDisabledDisplayUUIDs: Set<String>
 
     init(
         id: UUID = UUID(),
@@ -17,7 +18,8 @@ struct DockProfile: Identifiable, Codable, Equatable {
         createdAt: Date = Date(),
         autoActivate: Bool = false,
         dockPosition: DockPosition? = nil,
-        dockTileSize: Int? = nil
+        dockTileSize: Int? = nil,
+        hotCornersDisabledDisplayUUIDs: Set<String> = []
     ) {
         self.id = id
         self.name = name
@@ -26,6 +28,7 @@ struct DockProfile: Identifiable, Codable, Equatable {
         self.autoActivate = autoActivate
         self.dockPosition = dockPosition
         self.dockTileSize = dockTileSize
+        self.hotCornersDisabledDisplayUUIDs = hotCornersDisabledDisplayUUIDs
     }
 
     // Custom decoder to handle migration from profiles without newer fields
@@ -38,5 +41,6 @@ struct DockProfile: Identifiable, Codable, Equatable {
         autoActivate = try container.decodeIfPresent(Bool.self, forKey: .autoActivate) ?? false
         dockPosition = try container.decodeIfPresent(DockPosition.self, forKey: .dockPosition)
         dockTileSize = try container.decodeIfPresent(Int.self, forKey: .dockTileSize)
+        hotCornersDisabledDisplayUUIDs = try container.decodeIfPresent(Set<String>.self, forKey: .hotCornersDisabledDisplayUUIDs) ?? []
     }
 }

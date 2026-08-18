@@ -279,7 +279,9 @@ class MenuBarManager: NSObject, ObservableObject {
     }
 
     @objc func showMainWindow() {
-        if !(appSettings?.hideFromDock ?? false) { NSApp.setActivationPolicy(.regular) }
+        // Always switch to .regular so NSApp.activate reliably takes focus.
+        // WindowHiderDelegate restores .accessory on close when hideFromDock = true.
+        NSApp.setActivationPolicy(.regular)
 
         DispatchQueue.main.async {
             NSApp.activate(ignoringOtherApps: true)
@@ -290,7 +292,6 @@ class MenuBarManager: NSObject, ObservableObject {
                 return
             }
 
-            NotificationCenter.default.post(name: .showMainWindowRequested, object: nil)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 NSApp.activate(ignoringOtherApps: true)
                 for window in NSApp.windows where window.level == .normal && window.frame.width > 100 {

@@ -14,10 +14,13 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
 
-        print("[AppDelegate] applicationDidFinishLaunching: AXTrusted=\(AXIsProcessTrusted()) runInBackground=\(appSettings.runInBackground) autoRelocate=\(appSettings.autoRelocateDock) selectedDisplayUUID=\(appSettings.selectedDisplayUUID)")
+        print("[AppDelegate] applicationDidFinishLaunching: AXTrusted=\(AXIsProcessTrusted()) runInBackground=\(appSettings.runInBackground) autoRelocate=\(appSettings.autoRelocateDock)")
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(updateDockVisibility), name: .dockVisibilityChanged, object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(handleSystemWake), name: NSWorkspace.didWakeNotification, object: nil
         )
         menuBarManager.setup(appSettings: appSettings, coordinator: coordinator, updateChecker: updateChecker)
         updateActivationPolicy()
@@ -39,7 +42,7 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
         if appSettings.autoRelocateDock {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                print("[AppDelegate] autoRelocateDock: firing relocateDock")
+                print("[AppDelegate:autoRelocateDock] firing relocateDock")
                 self?.coordinator.relocateDock()
             }
         }
@@ -65,6 +68,14 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationWillTerminate(_ notification: Notification) {
         coordinator.stopMonitoring()
         NotificationCenter.default.removeObserver(self)
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    @objc private func handleSystemWake() {
+        print("[AppDelegate] handleSystemWake: system woke from sleep — scheduling monitoring restart")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.coordinator.handleSystemWake()
+        }
     }
 
     @objc private func updateDockVisibility() { updateActivationPolicy() }

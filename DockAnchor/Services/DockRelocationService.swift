@@ -8,6 +8,14 @@ import Cocoa
 import ApplicationServices
 import CoreGraphics
 
+// Extension to extract the CoreGraphics Direct Display ID from an NSScreen object
+extension NSScreen {
+    var displayID: CGDirectDisplayID? {
+        let key = NSDeviceDescriptionKey(rawValue: "NSScreenNumber")
+        return deviceDescription[key] as? CGDirectDisplayID
+    }
+}
+
 class DockRelocationService: @unchecked Sendable {
     static let shared = DockRelocationService()
 
@@ -22,7 +30,11 @@ class DockRelocationService: @unchecked Sendable {
     // MARK: - Public API
 
     func relocate(to display: DisplayInfo, dockPosition: DockPosition) async {
-        guard !isDockOnDisplay(display, dockPosition: dockPosition) else {
+        // NSScreen.screens is main-thread-only; run both guards on MainActor
+        let shouldSkip = await MainActor.run {
+            isDockOnCorrectDisplay(display, dockPosition: dockPosition)
+        }
+        guard !shouldSkip else {
             onStatusMessage?("Dock is already on \(display.name)")
             return
         }
@@ -38,7 +50,7 @@ class DockRelocationService: @unchecked Sendable {
             return CGPoint(x: nsMousePos.x, y: mainScreenHeight - nsMousePos.y)
         }
 
-        print("[DockRelocationService] relocate: starting — originalPos=\(originalPosition) displayID=\(display.id)")
+        print("[DockRelocationService:relocate] starting relocation to display='\(display.name)")
         isRelocating = true
         onStatusMessage?("Relocating dock to \(display.name)...")
 
@@ -52,11 +64,11 @@ class DockRelocationService: @unchecked Sendable {
 
                 let source = CGEventSource(stateID: .hidSystemState)
                 // Use physical dock position so sweep goes to the correct edge even if stored dockPosition is stale
-                let effectivePosition = self.detectDockState()?.position ?? dockPosition
+                let effectivePosition = DispatchQueue.main.sync { self.detectCurrentDockState()?.position } ?? dockPosition
                 let approachPoint = self.pastEdgePoint(for: display, dockPosition: effectivePosition)
                 let edgePoint = self.triggerPoint(for: display, dockPosition: effectivePosition)
 
-                print("[DockRelocationService] relocate: sweep \(approachPoint) → \(edgePoint)")
+                print("[DockRelocationService:relocate] sweeping mouse \(approachPoint) → \(edgePoint)")
 
                 self.sweepCursor(from: approachPoint, to: edgePoint, source: source)
                 self.dwellAtEdge(edgePoint, source: source)
@@ -77,34 +89,78 @@ class DockRelocationService: @unchecked Sendable {
         }
     }
 
-    func detectDockState() -> (displayID: CGDirectDisplayID, position: DockPosition)? {
-        let key = NSDeviceDescriptionKey("NSScreenNumber")
-        for screen in NSScreen.screens {
-            guard let displayID = screen.deviceDescription[key] as? CGDirectDisplayID else { continue }
-            let f = screen.frame
-            let vf = screen.visibleFrame
-            // Threshold > 5px avoids rounding artifacts; menu bar only insets maxY (top)
-            if vf.minY - f.minY > 5 { return (displayID, .bottom) }
-            if vf.minX - f.minX > 5 { return (displayID, .left) }
-            if f.maxX - vf.maxX > 5 { return (displayID, .right) }
+    func detectCurrentDockState() -> (displayID: CGDirectDisplayID, position: DockPosition)? {
+        // 1. Determine the global dock edge alignment from macOS defaults
+        let dockPositionString = UserDefaults.standard.string(forKey: "com.apple.dock.orientation") ?? "bottom"
+        guard let currentPosition = DockPosition(rawValue: dockPositionString) else { return nil }
+
+        // 2. Fetch all on-screen windows from the window server
+        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] else {
+            return nil
         }
-        return nil
+
+        // 3. Isolate the main Dock bar window geometry
+        for window in windowList {
+            guard let ownerName = window[kCGWindowOwnerName as String] as? String,
+                  ownerName == "Dock",
+                  let boundsDict = window[kCGWindowBounds as String] as? [String: Any],
+                  let dockRect = CGRect(dictionaryRepresentation: boundsDict as CFDictionary) else {
+                continue
+            }
+
+            // Filter out tiny UI elements like notification dots, download animations, or tooltips
+            if dockRect.size.width < 100 && dockRect.size.height < 100 { continue }
+
+            // 4. Calculate the true center point of the physical Dock bar
+            let dockCenter = CGPoint(x: dockRect.midX, y: dockRect.midY)
+
+            // 5. Correlate coordinate intersections against connected displays
+            for screen in NSScreen.screens {
+                // Translate the NSScreen layout over to CoreGraphics 2D space layout geometry
+                let screenFrameCG = convertToCGCoordinateSpace(screenFrame: screen.frame)
+
+                if screenFrameCG.contains(dockCenter) {
+                    // If it hits, extract the target CGDirectDisplayID from the dictionary map
+                    if let matchedID = screen.displayID {
+                        return (displayID: matchedID, position: currentPosition)
+                    }
+                }
+            }
+        }
+
+        // Fallback: If window tracking failed (permissions), return the main display ID as a safe fallback
+        return (displayID: CGMainDisplayID(), position: currentPosition)
     }
 
-    func isDockOnDisplay(_ display: DisplayInfo, dockPosition: DockPosition) -> Bool {
+    // Transforms NSScreen (bottom-left origin) layout calculations over to CoreGraphics space (top-left origin)
+    func convertToCGCoordinateSpace(screenFrame: CGRect) -> CGRect {
+        guard let primaryScreen = NSScreen.screens.first else { return screenFrame }
+        let primaryHeight = primaryScreen.frame.size.height
+
+        return CGRect(
+            x: screenFrame.origin.x,
+            y: primaryHeight - (screenFrame.origin.y + screenFrame.size.height),
+            width: screenFrame.size.width,
+            height: screenFrame.size.height
+        )
+    }
+
+    func isDockOnCorrectDisplay(_ display: DisplayInfo, dockPosition: DockPosition) -> Bool {
         let displays = DisplayService.shared.displays
         guard displays.count > 1 else { return true }
-        if let state = detectDockState() {
+        if let state = detectCurrentDockState() {
+            let detectedName = DisplayService.shared.displays.first { $0.id == state.displayID }?.name ?? "unknown"
             let result = state.displayID == display.id
-            print("[DockRelocationService] isDockOnDisplay: detectedID=\(state.displayID) displayID=\(display.id) match=\(result)")
+            print("[DockRelocationService:isDockOnCorrectDisplay] dock on \(detectedName), anchor \(display.name) → match=\(result)")
             return result
         }
         guard let currentID = currentDockDisplayID(dockPosition: dockPosition) else {
-            print("[DockRelocationService] isDockOnDisplay: currentDockDisplayID returned nil")
+            print("[DockRelocationService:isDockOnCorrectDisplay] AX fallback returned nil — assuming not on anchor")
             return false
         }
+        let foundName = DisplayService.shared.displays.first { $0.id == currentID }?.name ?? "unknown"
         let result = currentID == display.id
-        print("[DockRelocationService] isDockOnDisplay: currentID=\(currentID) displayID=\(display.id) match=\(result)")
+        print("[DockRelocationService:isDockOnCorrectDisplay] dock on \(foundName), anchor \(display.name) → match=\(result)")
         return result
     }
 
@@ -166,7 +222,7 @@ class DockRelocationService: @unchecked Sendable {
 
         let free = subtractRanges(from: (rangeMin, rangeMax), subtract: covered)
         let best = free.max(by: { ($0.1 - $0.0) < ($1.1 - $1.0) }) ?? (rangeMin, rangeMax)
-        print("[DockRelocationService] safeEdgeOffset: range=\(rangeMin)..\(rangeMax) covered=\(covered) best=\(best)")
+        print("[DockRelocationService:safeEdgeOffset] '\(display.name)' range=\(rangeMin)..\(rangeMax) covered=\(covered) best=\(best)")
         return (best.0 + best.1) / 2
     }
 
@@ -225,16 +281,15 @@ class DockRelocationService: @unchecked Sendable {
             guard let displayID = screen.deviceDescription[key] as? CGDirectDisplayID else { continue }
             let f = screen.frame
             let vf = screen.visibleFrame
-            print("[DockRelocationService] currentDockDisplayID: screen=\(displayID) frame=\(f) visibleFrame=\(vf) dockPos=\(dockPosition)")
             switch dockPosition {
             case .bottom where vf.minY > f.minY:
-                print("[DockRelocationService] currentDockDisplayID: found dock on \(displayID) (bottom)")
+                print("[DockRelocationService:currentDockDisplayID] dock on '\(screen.localizedName)' (bottom)")
                 return displayID
             case .left where vf.minX > f.minX:
-                print("[DockRelocationService] currentDockDisplayID: found dock on \(displayID) (left)")
+                print("[DockRelocationService:currentDockDisplayID] dock on '\(screen.localizedName)' (left)")
                 return displayID
             case .right where vf.maxX < f.maxX:
-                print("[DockRelocationService] currentDockDisplayID: found dock on \(displayID) (right)")
+                print("[DockRelocationService:currentDockDisplayID] dock on '\(screen.localizedName)' (right)")
                 return displayID
             default: continue
             }
@@ -245,11 +300,11 @@ class DockRelocationService: @unchecked Sendable {
 
     private func currentDockDisplayIDViaAX() -> CGDirectDisplayID? {
         let displays = DisplayService.shared.displays
-        print("[DockRelocationService] currentDockDisplayID: falling back to AX")
+        print("[DockRelocationService:currentDockDisplayIDViaAX] falling back to AX")
         guard let dockApp = NSRunningApplication.runningApplications(
             withBundleIdentifier: "com.apple.dock"
         ).first else {
-            print("[DockRelocationService] currentDockDisplayID: dock app not found")
+            print("[DockRelocationService:currentDockDisplayIDViaAX] dock app not found")
             return nil
         }
 
@@ -257,7 +312,7 @@ class DockRelocationService: @unchecked Sendable {
         var windowsValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(dockElement, kAXWindowsAttribute as CFString, &windowsValue) == .success,
               let windows = windowsValue as? [AXUIElement], !windows.isEmpty else {
-            print("[DockRelocationService] currentDockDisplayID: AX windows query failed")
+            print("[DockRelocationService:currentDockDisplayIDViaAX] AX windows query failed")
             return nil
         }
 
@@ -265,15 +320,15 @@ class DockRelocationService: @unchecked Sendable {
         guard AXUIElementCopyAttributeValue(
             windows[0], kAXPositionAttribute as CFString, &positionValue
         ) == .success else {
-            print("[DockRelocationService] currentDockDisplayID: AX position query failed")
+            print("[DockRelocationService:currentDockDisplayIDViaAX] AX position query failed")
             return nil
         }
 
         var position = CGPoint.zero
         guard let pv = positionValue, AXValueGetValue(pv as! AXValue, .cgPoint, &position) else { return nil }
-        let found = displays.first { $0.frame.contains(position) }?.id
-        print("[DockRelocationService] currentDockDisplayID: AX dock position=\(position) displayID=\(String(describing: found))")
-        return found
+        let found = displays.first { $0.frame.contains(position) }
+        print("[DockRelocationService:currentDockDisplayIDViaAX] dock at \(position) → '\(found?.name ?? "none")'")
+        return found?.id
     }
 
     private func sweepCursor(from start: CGPoint, to end: CGPoint, source: CGEventSource?) {
@@ -320,6 +375,6 @@ class DockRelocationService: @unchecked Sendable {
         CGAssociateMouseAndMouseCursorPosition(1)
         let safePosition = clampedToScreenEdge(position)
         CGWarpMouseCursorPosition(safePosition)
-        print("[DockRelocationService] restoreCursor: restored to \(safePosition) (original: \(position))")
+        print("[DockRelocationService:restoreCursor] restored mouse to \(safePosition) (original: \(position))")
     }
 }

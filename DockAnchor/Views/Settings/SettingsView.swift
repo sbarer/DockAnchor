@@ -7,7 +7,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var appSettings: AppSettings
-    @EnvironmentObject var coordinator: DockCoordinator
     @EnvironmentObject var updateChecker: UpdateChecker
     @Environment(\.dismiss) var dismiss
 
@@ -19,16 +18,14 @@ struct SettingsView: View {
                 VStack(spacing: 10) {
                     startupSection
                     dockBehaviorSection
-                    hotCornersSection
                     interfaceSection
-                    displayArrangementSection
                     footerSection
                 }
                 .padding(.horizontal)
                 .padding(.top, 12)
             }
         }
-        .frame(width: 420, height: 680)
+        .frame(width: 420, height: 420)
         .background(.background)
     }
 
@@ -88,27 +85,6 @@ struct SettingsView: View {
         .cardStyle()
     }
 
-    @ViewBuilder private var hotCornersSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Hot Corners").font(.subheadline).fontWeight(.semibold)
-            Text("When enabled, corner areas are excluded from edge blocking so macOS hot corners still fire.")
-                .font(.caption).foregroundColor(.secondary)
-            ForEach(coordinator.displays) { display in
-                HStack {
-                    Text(display.name).font(.callout)
-                    Spacer()
-                    Toggle("", isOn: Binding(
-                        get: { appSettings.isHotCornersPreserved(forDisplayUUID: display.uuid) },
-                        set: { appSettings.setHotCornersPreserved($0, forDisplayUUID: display.uuid) }
-                    ))
-                    .toggleStyle(.switch).labelsHidden().controlSize(.small)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
-    }
-
     @ViewBuilder private var interfaceSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Interface").font(.subheadline).fontWeight(.semibold)
@@ -133,21 +109,6 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 180)
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
-    }
-
-    @ViewBuilder private var displayArrangementSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Display Arrangement").font(.subheadline).fontWeight(.semibold)
-            DisplayArrangementView(
-                displays: coordinator.displays,
-                selectedDisplayUUID: $appSettings.selectedDisplayUUID,
-                maxHeight: 150
-            )
-            Text("\(coordinator.displays.count) display(s) detected")
-                .font(.caption).foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()

@@ -76,14 +76,26 @@ class AppSettings: ObservableObject {
     }
 
     func isHotCornersPreserved(forDisplayUUID uuid: String) -> Bool {
-        !hotCornersDisabledDisplayUUIDs.contains(uuid)
+        if let profile = activeProfile {
+            return !profile.hotCornersDisabledDisplayUUIDs.contains(uuid)
+        }
+        return !hotCornersDisabledDisplayUUIDs.contains(uuid)
     }
 
     func setHotCornersPreserved(_ preserved: Bool, forDisplayUUID uuid: String) {
-        if preserved {
-            hotCornersDisabledDisplayUUIDs.remove(uuid)
+        if let activeID = activeProfileID,
+           let index = profiles.firstIndex(where: { $0.id == activeID }) {
+            if preserved {
+                profiles[index].hotCornersDisabledDisplayUUIDs.remove(uuid)
+            } else {
+                profiles[index].hotCornersDisabledDisplayUUIDs.insert(uuid)
+            }
         } else {
-            hotCornersDisabledDisplayUUIDs.insert(uuid)
+            if preserved {
+                hotCornersDisabledDisplayUUIDs.remove(uuid)
+            } else {
+                hotCornersDisabledDisplayUUIDs.insert(uuid)
+            }
         }
     }
 
@@ -151,7 +163,7 @@ class AppSettings: ObservableObject {
         
         self.runInBackground = UserDefaults.standard.object(forKey: "runInBackground") as? Bool ?? true
         self.showStatusIcon = UserDefaults.standard.object(forKey: "showStatusIcon") as? Bool ?? true
-        self.hideFromDock = UserDefaults.standard.object(forKey: "hideFromDock") as? Bool ?? false
+        self.hideFromDock = UserDefaults.standard.object(forKey: "hideFromDock") as? Bool ?? true
         self.autoRelocateDock = UserDefaults.standard.object(forKey: "autoRelocateDock") as? Bool ?? true
 
         let savedDisabled = UserDefaults.standard.stringArray(forKey: "hotCornersDisabledDisplayUUIDs") ?? []

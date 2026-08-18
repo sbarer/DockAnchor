@@ -44,29 +44,32 @@ class DockCoordinator: ObservableObject {
     private func setupInitialState() {
         anchorDisplayUUID = AppSettings.shared.selectedDisplayUUID
         displays = DisplayService.shared.displays
-        print("[DockCoordinator] setupInitialState: anchorDisplayUUID=\(anchorDisplayUUID) displays=\(displays.count) AXTrusted=\(AXIsProcessTrusted())")
+        let anchorDisplayName = DisplayService.shared.display(forUUID: anchorDisplayUUID)?.name ?? "Default"
+        print("[DockCoordinator:setupInitialState] anchorDisplay=\(anchorDisplayName) displays=\(displays.count) AXTrusted=\(AXIsProcessTrusted())")
         DisplayService.shared.$displays
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newDisplays in
                 self?.displays = newDisplays
-                print("[DockCoordinator] displays updated: count=\(newDisplays.count) \(newDisplays.map { "\($0.name)[\($0.id)]" })")
+                print("[DockCoordinator:setupInitialState] displays updated: count=\(newDisplays.count) \(newDisplays.map { "\($0.name)[\($0.id)]" })")
             }
             .store(in: &cancellables)
         let systemPosition = DockResizeService.shared.currentPosition()
         if let profilePosition = AppSettings.shared.activeProfile?.dockPosition {
             dockPosition = profilePosition
             if systemPosition != profilePosition {
-                print("[DockCoordinator] setupInitialState: system=\(systemPosition) differs from profile=\(profilePosition), using profile value")
+                print("[DockCoordinator:setupInitialState] system=\(systemPosition) differs from profile=\(profilePosition), using profile value")
             }
         } else {
+            print("[DockCoordinator:setupInitialState] system=\(systemPosition) is same as profile=\(AppSettings.shared.activeProfile?.dockPosition?.rawValue ?? "Unknown"), using system value")
             dockPosition = systemPosition
         }
-        print("[DockCoordinator] setupInitialState: dockPosition=\(dockPosition)")
+        let dockScreen = DockRelocationService.shared.detectCurrentDockState().flatMap { state in DisplayService.shared.displays.first { $0.id == state.displayID } }?.name ?? "unknown"
+        print("[DockCoordinator:setupInitialState] dockPosition=\(dockPosition) dockCurrentlyOn='\(dockScreen)' anchor='\(anchoredDisplayName)'")
         updateAnchoredDisplayName()
         refreshAnchoredState()
         if !PermissionService.shared.check() {
             needsPermissionReset = true
-            print("[DockCoordinator] setupInitialState: WARNING — AX permission not granted")
+            print("[DockCoordinator:setupInitialState] WARNING — AX permission not granted")
         }
     }
 
@@ -109,7 +112,7 @@ class DockCoordinator: ObservableObject {
         .sink { [weak self] _ in
             guard let self else { return }
             // Physical detection is most accurate; fall back to active profile, then defaults
-            if let detected = DockRelocationService.shared.detectDockState()?.position {
+            if let detected = DockRelocationService.shared.detectCurrentDockState()?.position {
                 if self.dockPosition != detected {
                     print("[DockCoordinator] dock.refresh: dockPosition → \(detected) (visibleFrame)")
                     self.dockPosition = detected
@@ -134,7 +137,7 @@ class DockCoordinator: ObservableObject {
     // MARK: - Monitoring lifecycle
 
     func startMonitoring() {
-        print("[DockCoordinator] startMonitoring: called — isActive=\(isActive) AXTrusted=\(AXIsProcessTrusted()) anchorUUID=\(anchorDisplayUUID) anchorID=\(anchorDisplayID)")
+        print("[DockCoordinator] startMonitoring: called — isActive=\(isActive) AXTrusted=\(AXIsProcessTrusted()) anchorID=\(anchorDisplayID)")
         guard PermissionService.shared.check() else {
             needsPermissionReset = true
             statusMessage = "Accessibility permissions required"
@@ -169,11 +172,10 @@ class DockCoordinator: ObservableObject {
     // MARK: - Anchor display
 
     func changeAnchorDisplay(toUUID uuid: String) {
-        print("[DockCoordinator] changeAnchorDisplay: uuid=\(uuid) available=\(DisplayService.shared.isAvailable(uuid: uuid))")
         if DisplayService.shared.isAvailable(uuid: uuid) {
             anchorDisplayUUID = uuid
             updateAnchoredDisplayName()
-            print("[DockCoordinator] changeAnchorDisplay: set anchorDisplayUUID=\(anchorDisplayUUID) anchorID=\(anchorDisplayID) name=\(anchoredDisplayName)")
+            print("[DockCoordinator:changeAnchorDisplay] Changing to \(anchoredDisplayName) anchorID=\(anchorDisplayID) anchorDisplay=\(anchorDisplayUUID)")
             postStatus("Anchor changed to \(anchoredDisplayName)")
         } else {
             let defaultUUID = defaultAnchorDisplayUUID()
@@ -312,6 +314,26 @@ class DockCoordinator: ObservableObject {
         postStatus(isActive ? "Dock Anchor Deluxe Active - Monitoring mouse movement" : "Dock Anchor Deluxe Ready")
     }
 
+    // MARK: - Wake from sleep
+
+    func handleSystemWake() {
+        print("[DockCoordinator] handleSystemWake: stopping and restarting monitoring")
+        stopMonitoring()
+        guard PermissionService.shared.check() else {
+            print("[DockCoordinator] handleSystemWake: no AX permission — skipping restart")
+            return
+        }
+        guard AppSettings.shared.runInBackground else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.startMonitoring()
+        }
+        if AppSettings.shared.autoRelocateDock {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.relocateDock()
+            }
+        }
+    }
+
     // MARK: - Permission
 
     func handlePermissionRevoked() {
@@ -350,7 +372,7 @@ class DockCoordinator: ObservableObject {
         guard AppSettings.shared.autoRelocateDock else { return }
         guard !DockRelocationService.shared.isRelocating else { return }
         guard let anchorDisplay = DisplayService.shared.display(forUUID: anchorDisplayUUID) else { return }
-        guard !DockRelocationService.shared.isDockOnDisplay(anchorDisplay, dockPosition: dockPosition) else { return }
+        guard !DockRelocationService.shared.isDockOnCorrectDisplay(anchorDisplay, dockPosition: dockPosition) else { return }
         print("[DockCoordinator] positionCheck: dock not on anchor display, relocating")
         relocateDock()
     }
@@ -377,20 +399,25 @@ class DockCoordinator: ObservableObject {
     }
 
     private func hotCornerTick() {
+        print("[DockCoordinates:hotCornerTick] hotCornerAttempts: \(hotCornerAttempts)")
         guard let anchorDisplay = DisplayService.shared.display(forUUID: anchorDisplayUUID) else {
+            print("[DockCoordinates:hotCornerTick] Can't get anchor display variable")
             stopHotCornerWatch()
             return
         }
-        if DockRelocationService.shared.isDockOnDisplay(anchorDisplay, dockPosition: dockPosition) {
+        if DockRelocationService.shared.isDockOnCorrectDisplay(anchorDisplay, dockPosition: dockPosition) {
+            print("[DockCoordinates:hotCornerTick] Dock Already in correct position: \(dockPosition) on \(anchorDisplay)")
             stopHotCornerWatch()
             return
         }
         hotCornerAttempts += 1
         if hotCornerAttempts > 5 {
             stopHotCornerWatch()
+            print("[DockCoordinates:hotCornerTick] Hit Max Attempts")
             return
         }
         guard !DockRelocationService.shared.isRelocating else { return }
+        print("[DockCoordinates: Tick] relocating dock")
         relocateDock()
     }
 
@@ -400,7 +427,7 @@ class DockCoordinator: ObservableObject {
         guard let anchorDisplay = DisplayService.shared.display(forUUID: anchorDisplayUUID) else {
             return // can't verify, keep current isDockAnchored
         }
-        guard let state = DockRelocationService.shared.detectDockState() else {
+        guard let state = DockRelocationService.shared.detectCurrentDockState() else {
             return // autohide or transitioning — keep current isDockAnchored rather than defaulting to false
         }
         if dockPosition != state.position {

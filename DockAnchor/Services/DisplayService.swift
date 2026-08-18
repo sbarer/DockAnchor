@@ -139,7 +139,7 @@ class DisplayService: ObservableObject {
 
     private func refresh() {
         let newDisplays = enumerate()
-        print("[DisplayService] refresh: found \(newDisplays.count) displays: \(newDisplays.map { "\($0.name) id=\($0.id) frame=\($0.frame)" })")
+        print("[DisplayService:refresh] found \(newDisplays.count) displays: \(newDisplays.map { "\($0.name) id=\($0.id)" })")
         // Always called from main thread (init + handleReconfiguration). Update synchronously
         // so callers can read the updated `displays` array immediately after this returns.
         displays = newDisplays
