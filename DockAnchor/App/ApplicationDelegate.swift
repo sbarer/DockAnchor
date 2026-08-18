@@ -22,6 +22,9 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(handleSystemWake), name: NSWorkspace.didWakeNotification, object: nil
         )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(handleSystemSleep), name: NSWorkspace.willSleepNotification, object: nil
+        )
         menuBarManager.setup(appSettings: appSettings, coordinator: coordinator, updateChecker: updateChecker)
         updateActivationPolicy()
 
@@ -69,6 +72,11 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         coordinator.stopMonitoring()
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+
+    @objc private func handleSystemSleep() {
+        print("[AppDelegate] handleSystemSleep: stopping monitoring before sleep")
+        coordinator.handleSystemSleep()
     }
 
     @objc private func handleSystemWake() {

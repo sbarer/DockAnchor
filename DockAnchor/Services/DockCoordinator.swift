@@ -314,7 +314,12 @@ class DockCoordinator: ObservableObject {
         postStatus(isActive ? "Dock Anchor Deluxe Active - Monitoring mouse movement" : "Dock Anchor Deluxe Ready")
     }
 
-    // MARK: - Wake from sleep
+    // MARK: - Sleep / wake
+
+    func handleSystemSleep() {
+        print("[DockCoordinator] handleSystemSleep: stopping monitoring")
+        stopMonitoring()
+    }
 
     func handleSystemWake() {
         print("[DockCoordinator] handleSystemWake: stopping and restarting monitoring")

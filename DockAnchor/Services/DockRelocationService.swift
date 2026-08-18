@@ -356,6 +356,7 @@ class DockRelocationService: @unchecked Sendable {
 
     private func dwellAtEdge(_ point: CGPoint, source: CGEventSource?) {
         CGAssociateMouseAndMouseCursorPosition(0)
+        defer { CGAssociateMouseAndMouseCursorPosition(1) }
         CGWarpMouseCursorPosition(point)
 
         for _ in 0..<20 {
@@ -372,7 +373,6 @@ class DockRelocationService: @unchecked Sendable {
     }
 
     private func restoreCursor(to position: CGPoint) {
-        CGAssociateMouseAndMouseCursorPosition(1)
         let safePosition = clampedToScreenEdge(position)
         CGWarpMouseCursorPosition(safePosition)
         print("[DockRelocationService:restoreCursor] restored mouse to \(safePosition) (original: \(position))")
