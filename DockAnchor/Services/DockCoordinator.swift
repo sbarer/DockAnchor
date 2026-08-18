@@ -105,6 +105,20 @@ class DockCoordinator: ObservableObject {
             }
             .store(in: &cancellables)
 
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.activeSpaceDidChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, AppSettings.shared.autoRelocateDock, !DockRelocationService.shared.isRelocating else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                    guard let self else { return }
+                    guard let anchorDisplay = DisplayService.shared.display(forUUID: self.anchorDisplayUUID) else { return }
+                    guard !DockRelocationService.shared.isDockOnCorrectDisplay(anchorDisplay, dockPosition: self.dockPosition) else { return }
+                    print("[DockCoordinator] activeSpaceDidChange: dock not on anchor, relocating")
+                    self.relocateDock()
+                }
+            }
+            .store(in: &cancellables)
+
         DistributedNotificationCenter.default().publisher(
             for: NSNotification.Name("com.apple.dock.refresh")
         )
@@ -358,7 +372,7 @@ class DockCoordinator: ObservableObject {
         guard positionCheckTimer == nil else { return }
         DispatchQueue.main.async { [weak self] in
             guard let self, self.positionCheckTimer == nil else { return }
-            self.positionCheckTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            self.positionCheckTimer = Timer.scheduledTimer(withTimeInterval: 600, repeats: true) { [weak self] _ in
                 self?.runPositionCheck()
             }
         }
