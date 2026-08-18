@@ -128,8 +128,7 @@ class DockRelocationService: @unchecked Sendable {
             }
         }
 
-        // Fallback: If window tracking failed (permissions), return the main display ID as a safe fallback
-        return (displayID: CGMainDisplayID(), position: currentPosition)
+        return nil
     }
 
     // Transforms NSScreen (bottom-left origin) layout calculations over to CoreGraphics space (top-left origin)
