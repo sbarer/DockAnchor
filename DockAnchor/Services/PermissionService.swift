@@ -58,8 +58,8 @@ class PermissionService {
 
     private func poll() {
         guard !AXIsProcessTrusted() else { return }
-        DispatchQueue.main.async { [weak self] in
-            self?.onRevoked?()
-        }
+        // Stop polling immediately to prevent multiple onRevoked calls before stopMonitoring runs
+        stopPolling()
+        onRevoked?()
     }
 }

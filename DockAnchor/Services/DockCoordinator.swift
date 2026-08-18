@@ -342,10 +342,8 @@ class DockCoordinator: ObservableObject {
     // MARK: - Permission
 
     func handlePermissionRevoked() {
-        DispatchQueue.main.async { [weak self] in
-            self?.statusMessage = "Accessibility permissions revoked - stopping monitoring"
-            self?.stopMonitoring()
-        }
+        statusMessage = "Accessibility permissions revoked - stopping monitoring"
+        stopMonitoring()
     }
 
     // MARK: - Display name
