@@ -19,7 +19,12 @@ extension NSScreen {
 class DockRelocationService: @unchecked Sendable {
     static let shared = DockRelocationService()
 
-    private(set) var isRelocating: Bool = false
+    private let relocatingLock = NSLock()
+    private var _isRelocating: Bool = false
+    private(set) var isRelocating: Bool {
+        get { relocatingLock.withLock { _isRelocating } }
+        set { relocatingLock.withLock { _isRelocating = newValue } }
+    }
 
     // Set by DockCoordinator (Phase 3)
     var onStatusMessage: ((String) -> Void)?
