@@ -113,7 +113,7 @@ struct DockRelocationServiceTests {
         let mainH = NSScreen.main?.frame.height ?? 0
         // A point near the top-left corner of the display in CG coords
         let cornerPoint = CGPoint(x: f.minX + 5, y: mainH - f.maxY + 5)
-        let clamped = svc.clampedToScreenEdge(cornerPoint, buffer: 15)
+        let clamped = svc.clampedToScreenEdge(cornerPoint, mainScreenHeight: mainH, buffer: 15)
         #expect(clamped.x >= f.minX + 15)
     }
 }

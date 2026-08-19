@@ -49,10 +49,10 @@ class DockRelocationService: @unchecked Sendable {
             return
         }
 
-        let originalPosition = await MainActor.run {
+        let (originalPosition, mainScreenHeight) = await MainActor.run {
+            let h = NSScreen.main?.frame.height ?? 0
             let nsMousePos = NSEvent.mouseLocation
-            let mainScreenHeight = NSScreen.main?.frame.height ?? 0
-            return CGPoint(x: nsMousePos.x, y: mainScreenHeight - nsMousePos.y)
+            return (CGPoint(x: nsMousePos.x, y: h - nsMousePos.y), h)
         }
 
         print("[DockRelocationService:relocate] starting relocation to display='\(display.name)")
@@ -77,7 +77,7 @@ class DockRelocationService: @unchecked Sendable {
 
                 self.sweepCursor(from: approachPoint, to: edgePoint, source: source)
                 self.dwellAtEdge(edgePoint, source: source)
-                self.restoreCursor(to: originalPosition)
+                self.restoreCursor(to: originalPosition, mainScreenHeight: mainScreenHeight)
 
                 self.isRelocating = false
                 self.removeTemporaryTap()
@@ -251,9 +251,9 @@ class DockRelocationService: @unchecked Sendable {
         }
     }
 
-    func clampedToScreenEdge(_ point: CGPoint, buffer: CGFloat = 15) -> CGPoint {
+    func clampedToScreenEdge(_ point: CGPoint, mainScreenHeight: CGFloat, buffer: CGFloat = 15) -> CGPoint {
         let displays = DisplayService.shared.displays
-        let mainH = NSScreen.main?.frame.height ?? 0
+        let mainH = mainScreenHeight
         for display in displays {
             let f = display.frame
             let cgBounds = CGRect(x: f.minX, y: mainH - f.maxY, width: f.width, height: f.height)
@@ -376,8 +376,8 @@ class DockRelocationService: @unchecked Sendable {
         }
     }
 
-    private func restoreCursor(to position: CGPoint) {
-        let safePosition = clampedToScreenEdge(position)
+    private func restoreCursor(to position: CGPoint, mainScreenHeight: CGFloat) {
+        let safePosition = clampedToScreenEdge(position, mainScreenHeight: mainScreenHeight)
         CGWarpMouseCursorPosition(safePosition)
         print("[DockRelocationService:restoreCursor] restored mouse to \(safePosition) (original: \(position))")
     }
