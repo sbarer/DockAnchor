@@ -221,6 +221,7 @@ class DockCoordinator: ObservableObject {
     // MARK: - Dock operations
 
     func relocateDock() {
+        guard isActive else { return }
         guard let anchorDisplay = DisplayService.shared.display(forUUID: anchorDisplayUUID) else {
             statusMessage = "Cannot relocate dock - anchor display not found"
             return
