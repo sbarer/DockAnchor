@@ -78,9 +78,21 @@ class DisplayService: ObservableObject {
     var onDisplayRemoved: ((CGDirectDisplayID) -> Void)?
     var onLayoutChanged: (() -> Void)?
 
+    private static let reconfigCallback: CGDisplayReconfigurationCallBack = { displayID, flags, userInfo in
+        guard let userInfo else { return }
+        let service = Unmanaged<DisplayService>.fromOpaque(userInfo).takeUnretainedValue()
+        DispatchQueue.main.async {
+            service.handleReconfiguration(displayID: displayID, flags: flags)
+        }
+    }
+
     private init() {
         registerReconfigurationCallback()
         refresh()
+    }
+
+    deinit {
+        CGDisplayRemoveReconfigurationCallback(DisplayService.reconfigCallback, Unmanaged.passUnretained(self).toOpaque())
     }
 
     // MARK: - Public API
@@ -195,13 +207,7 @@ class DisplayService: ObservableObject {
     }
 
     private func registerReconfigurationCallback() {
-        CGDisplayRegisterReconfigurationCallback({ displayID, flags, userInfo in
-            guard let userInfo = userInfo else { return }
-            let service = Unmanaged<DisplayService>.fromOpaque(userInfo).takeUnretainedValue()
-            DispatchQueue.main.async {
-                service.handleReconfiguration(displayID: displayID, flags: flags)
-            }
-        }, Unmanaged.passUnretained(self).toOpaque())
+        CGDisplayRegisterReconfigurationCallback(DisplayService.reconfigCallback, Unmanaged.passUnretained(self).toOpaque())
     }
 
     private func handleReconfiguration(displayID: CGDirectDisplayID, flags: CGDisplayChangeSummaryFlags) {
