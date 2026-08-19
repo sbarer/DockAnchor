@@ -59,9 +59,10 @@ class DockRelocationService: @unchecked Sendable {
         isRelocating = true
         onStatusMessage?("Relocating dock to \(display.name)...")
 
-        await withCheckedContinuation { continuation in
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else { continuation.resume(); return }
+                defer { continuation.resume() }
+                guard let self = self else { return }
 
                 self.prepareEventTap()
 
@@ -88,8 +89,6 @@ class DockRelocationService: @unchecked Sendable {
                     self?.onRelocationComplete?()
                     self?.onStatusMessage?("Dock relocated to \(display.name)")
                 }
-
-                continuation.resume()
             }
         }
     }
