@@ -26,6 +26,7 @@ class DockCoordinator: ObservableObject {
     private var positionCheckTimer: Timer?
     private var hotCornerWatchTimer: Timer?
     private var hotCornerAttempts: Int = 0
+    private var spaceChangeWorkItem: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Computed
@@ -108,14 +109,17 @@ class DockCoordinator: ObservableObject {
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.activeSpaceDidChangeNotification)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                guard let self, AppSettings.shared.autoRelocateDock, !DockRelocationService.shared.isRelocating else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                    guard let self else { return }
+                guard let self, AppSettings.shared.autoRelocateDock else { return }
+                self.spaceChangeWorkItem?.cancel()
+                let item = DispatchWorkItem { [weak self] in
+                    guard let self, !DockRelocationService.shared.isRelocating else { return }
                     guard let anchorDisplay = DisplayService.shared.display(forUUID: self.anchorDisplayUUID) else { return }
                     guard !DockRelocationService.shared.isDockOnCorrectDisplay(anchorDisplay, dockPosition: self.dockPosition) else { return }
                     print("[DockCoordinator] activeSpaceDidChange: dock not on anchor, relocating")
                     self.relocateDock()
                 }
+                self.spaceChangeWorkItem = item
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: item)
             }
             .store(in: &cancellables)
 
