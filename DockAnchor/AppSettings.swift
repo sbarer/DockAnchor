@@ -33,10 +33,12 @@ class AppSettings: ObservableObject {
 
     @Published var startAtLogin: Bool {
         didSet {
+            guard !isUpdatingLoginItem else { return }
             UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin")
             updateLoginItem()
         }
     }
+    private var isUpdatingLoginItem = false
     
     @Published var runInBackground: Bool {
         didSet {
@@ -218,7 +220,11 @@ class AppSettings: ObservableObject {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            print("Failed to update login item: \(error)")
+            print("[AppSettings:updateLoginItem] failed: \(error) — reverting startAtLogin")
+            isUpdatingLoginItem = true
+            startAtLogin = !startAtLogin
+            UserDefaults.standard.set(startAtLogin, forKey: "startAtLogin")
+            isUpdatingLoginItem = false
         }
     }
 
