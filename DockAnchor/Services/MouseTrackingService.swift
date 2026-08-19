@@ -7,6 +7,12 @@ import Foundation
 import Cocoa
 import CoreGraphics
 
+struct AnchorState {
+    var isDockAnchored: Bool = true
+    var anchorDisplayID: CGDirectDisplayID = CGMainDisplayID()
+    var dockPosition: DockPosition = .bottom
+}
+
 class MouseTrackingService {
     static let shared = MouseTrackingService()
 
@@ -14,7 +20,8 @@ class MouseTrackingService {
     var eventTap: CFMachPort?
     var runLoopSource: CFRunLoopSource?
 
-    // Set by DockCoordinator (Phase 3)
+    var anchorState: AnchorState = AnchorState()
+
     var onHotCornerDetected: (() -> Void)?
     var onStatusMessage: ((String) -> Void)?
 
@@ -128,8 +135,7 @@ class MouseTrackingService {
     // MARK: - Internal (testable)
 
     func triggerZone(for display: DisplayInfo) -> CGRect {
-        let dockPosition = DockCoordinator.shared.dockPosition
-        switch dockPosition {
+        switch anchorState.dockPosition {
         case .bottom:
             return CGRect(x: display.frame.minX, y: display.frame.maxY - 15,
                           width: display.frame.width, height: 15)
@@ -145,8 +151,7 @@ class MouseTrackingService {
     func cornerZones(for display: DisplayInfo) -> [CGRect] {
         let f = display.frame
         let s = cornerZoneSize
-        let dockPosition = DockCoordinator.shared.dockPosition
-        switch dockPosition {
+        switch anchorState.dockPosition {
         case .bottom:
             return [CGRect(x: f.minX, y: f.maxY - s, width: s, height: s),
                     CGRect(x: f.maxX - s, y: f.maxY - s, width: s, height: s)]
@@ -164,8 +169,8 @@ class MouseTrackingService {
     }
 
     func shouldBlock(at location: CGPoint) -> Bool {
-        guard DockCoordinator.shared.isDockAnchored else { return false }
-        let anchorID = DockCoordinator.shared.anchorDisplayID
+        guard anchorState.isDockAnchored else { return false }
+        let anchorID = anchorState.anchorDisplayID
         let allDisplays = DisplayService.shared.displays
 
         guard let currentDisplay = allDisplays.first(where: { $0.frame.contains(location) }) else {

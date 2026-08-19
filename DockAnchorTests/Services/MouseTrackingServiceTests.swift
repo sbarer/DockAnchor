@@ -11,7 +11,7 @@ import CoreGraphics
 struct MouseTrackingServiceTests {
 
     private let svc = MouseTrackingService.shared
-    private let cornerSize: CGFloat = 60
+    private let cornerSize: CGFloat = 15
 
     // Remote display well outside real screen coordinates
     private func remoteDisplay() -> DisplayInfo {
@@ -27,8 +27,8 @@ struct MouseTrackingServiceTests {
         let display = remoteDisplay()
         let zone = svc.triggerZone(for: display)
         #expect(zone.minX == display.frame.minX)
-        #expect(zone.height == 10)
-        #expect(zone.minY == display.frame.maxY - 10)
+        #expect(zone.height == 15)
+        #expect(zone.minY == display.frame.maxY - 15)
         #expect(zone.width == display.frame.width)
     }
 
@@ -37,7 +37,7 @@ struct MouseTrackingServiceTests {
         let display = remoteDisplay()
         let zone = svc.triggerZone(for: display)
         #expect(zone.minX == display.frame.minX)
-        #expect(zone.width == 10)
+        #expect(zone.width == 15)
         #expect(zone.minY == display.frame.minY)
         #expect(zone.height == display.frame.height)
     }
@@ -46,8 +46,8 @@ struct MouseTrackingServiceTests {
         DockCoordinator.shared.dockPosition = .right
         let display = remoteDisplay()
         let zone = svc.triggerZone(for: display)
-        #expect(zone.minX == display.frame.maxX - 10)
-        #expect(zone.width == 10)
+        #expect(zone.minX == display.frame.maxX - 15)
+        #expect(zone.width == 15)
         #expect(zone.minY == display.frame.minY)
         #expect(zone.height == display.frame.height)
     }

@@ -19,9 +19,9 @@ class DockCoordinator: ObservableObject {
     @Published private(set) var displays: [DisplayInfo] = []
 
     // MARK: - Internal state
-    var anchorDisplayUUID: String = ""
-    var dockPosition: DockPosition = .bottom
-    private(set) var isDockAnchored: Bool = true
+    var anchorDisplayUUID: String = "" { didSet { syncAnchorState() } }
+    var dockPosition: DockPosition = .bottom { didSet { syncAnchorState() } }
+    private(set) var isDockAnchored: Bool = true { didSet { syncAnchorState() } }
 
     private var positionCheckTimer: Timer?
     private var hotCornerWatchTimer: Timer?
@@ -443,6 +443,14 @@ class DockCoordinator: ObservableObject {
     }
 
     // MARK: - Helpers
+
+    private func syncAnchorState() {
+        MouseTrackingService.shared.anchorState = AnchorState(
+            isDockAnchored: isDockAnchored,
+            anchorDisplayID: anchorDisplayID,
+            dockPosition: dockPosition
+        )
+    }
 
     func refreshAnchoredState() {
         guard let anchorDisplay = DisplayService.shared.display(forUUID: anchorDisplayUUID) else {
