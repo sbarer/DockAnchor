@@ -45,12 +45,23 @@ App launch
   → DockCoordinator.setupInitialState() → refreshAnchoredState() → detectCurrentDockState()
   → ApplicationDelegate: changeAnchorDisplay → startMonitoring (+1s) → relocateDock (+1.5s)
 
+System sleep
+  → NSWorkspace.willSleepNotification → ApplicationDelegate → coordinator.handleSystemSleep()
+  → stopMonitoring() (tears down event tap, timers, permission polling)
+
+System wake
+  → NSWorkspace.didWakeNotification → ApplicationDelegate (2s delay)
+  → coordinator.handleSystemWake() → stopMonitoring() → startMonitoring (+1s) → relocateDock (+1.5s)
+
 Mouse moves near dock edge
   → CGEvent tap (MouseTrackingService)
   → hot corner detected → onHotCornerDetected → startHotCornerWatch
   → hotCornerTick every 1s: isDockOnCorrectDisplay? → if false → relocateDock (max 5 attempts)
 
-300s timer fires (positionCheckTimer)
+Space switch (activeSpaceDidChangeNotification)
+  → debounced 0.5s DispatchWorkItem → isDockOnCorrectDisplay? → if false → relocateDock
+
+600s timer fires (positionCheckTimer, safety-net)
   → isDockOnCorrectDisplay? → if false + autoRelocateDock → relocateDock
 
 Display connect/disconnect
@@ -82,7 +93,7 @@ com.apple.dock.refresh notification
 |---|---|---|
 | `PermissionService` poll | configurable (5s while monitoring) | Detect Accessibility permission revocation |
 | `hotCornerWatchTimer` | 2s initial delay → 1s × 5 | Re-anchor after hot-corner pass moves Dock |
-| `positionCheckTimer` | 300s | Periodic confirm Dock is still on anchor; relocate if not |
+| `positionCheckTimer` | 600s | Safety-net periodic check; primary trigger is `activeSpaceDidChangeNotification` |
 
 ## Notifications
 
@@ -92,6 +103,9 @@ com.apple.dock.refresh notification
 | `.defaultAnchorDisplayChanged` | AppSettings → DockCoordinator | Default anchor preference changed |
 | `.dockVisibilityChanged` | AppSettings → ApplicationDelegate | `hideFromDock` toggle changed |
 | `.statusIconVisibilityChanged` | AppSettings → MenuBarManager | Status icon toggle changed |
+| `NSWorkspace.willSleepNotification` | System → ApplicationDelegate | System about to sleep — stops monitoring |
+| `NSWorkspace.didWakeNotification` | System → ApplicationDelegate | System woke — restarts monitoring after 2s |
+| `NSWorkspace.activeSpaceDidChangeNotification` | System → DockCoordinator | Space switch — debounced 0.5s position check |
 
 ## Threading
 
