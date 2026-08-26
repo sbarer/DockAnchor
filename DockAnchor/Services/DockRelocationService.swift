@@ -64,9 +64,12 @@ class DockRelocationService: @unchecked Sendable {
                 defer { continuation.resume() }
                 guard let self = self else { return }
 
-                self.prepareEventTap()
-
-                DispatchQueue.main.sync { NSCursor.hide() }
+                // Both prepareEventTap and NSCursor.hide must run on the main thread to avoid
+                // data races on eventTap/runLoopSource with startTracking/stopTracking.
+                DispatchQueue.main.sync {
+                    self.prepareEventTap()
+                    NSCursor.hide()
+                }
 
                 let source = CGEventSource(stateID: .hidSystemState)
                 // Use physical dock position so sweep goes to the correct edge even if stored dockPosition is stale
@@ -81,9 +84,13 @@ class DockRelocationService: @unchecked Sendable {
                 self.restoreCursor(to: originalPosition, mainScreenHeight: mainScreenHeight)
 
                 self.isRelocating = false
-                self.removeTemporaryTap()
 
-                DispatchQueue.main.sync { NSCursor.unhide() }
+                // removeTemporaryTap must run on the main thread — it accesses eventTap/runLoopSource
+                // which are also written by startTracking/stopTracking on the main thread.
+                DispatchQueue.main.sync {
+                    self.removeTemporaryTap()
+                    NSCursor.unhide()
+                }
 
                 DispatchQueue.main.async { [weak self] in
                     self?.onRelocationComplete?()

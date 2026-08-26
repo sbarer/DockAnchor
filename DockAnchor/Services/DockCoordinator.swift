@@ -182,6 +182,7 @@ class DockCoordinator: ObservableObject {
         print("[DockCoordinator] stopMonitoring: called")
         PermissionService.shared.stopPolling()
         stopPositionCheckTimer()
+        stopHotCornerWatch()
         MouseTrackingService.shared.stopTracking()
         isActive = false
         statusMessage = "Dock Anchor Deluxe Stopped"
