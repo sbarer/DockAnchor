@@ -7,6 +7,7 @@ import Foundation
 import Cocoa
 import ApplicationServices
 import CoreGraphics
+import os.log
 
 // Extension to extract the CoreGraphics Direct Display ID from an NSScreen object
 extension NSScreen {
@@ -18,6 +19,7 @@ extension NSScreen {
 
 class DockRelocationService: @unchecked Sendable {
     static let shared = DockRelocationService()
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "DockAnchorDeluxe", category: "DockRelocationService")
 
     private let relocatingLock = NSLock()
     private var _isRelocating: Bool = false
@@ -55,18 +57,24 @@ class DockRelocationService: @unchecked Sendable {
             return (CGPoint(x: nsMousePos.x, y: h - nsMousePos.y), h)
         }
 
-        print("[DockRelocationService:relocate] starting relocation to display='\(display.name)")
+        logger.info("relocate: starting to '\(display.name, privacy: .public)' position=\(dockPosition.rawValue, privacy: .public)")
         isRelocating = true
         onStatusMessage?("Relocating dock to \(display.name)...")
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                defer { continuation.resume() }
+                defer {
+                    self?.logger.info("relocate: GCD block completing — resuming continuation")
+                    continuation.resume()
+                }
                 guard let self = self else { return }
+
+                logger.info("relocate: GCD block started")
 
                 // Both prepareEventTap and NSCursor.hide must run on the main thread to avoid
                 // data races on eventTap/runLoopSource with startTracking/stopTracking.
                 DispatchQueue.main.sync {
+                    self.logger.info("relocate: prepareEventTap+hide (main thread)")
                     self.prepareEventTap()
                     NSCursor.hide()
                 }
@@ -77,17 +85,20 @@ class DockRelocationService: @unchecked Sendable {
                 let approachPoint = self.pastEdgePoint(for: display, dockPosition: effectivePosition)
                 let edgePoint = self.triggerPoint(for: display, dockPosition: effectivePosition)
 
-                print("[DockRelocationService:relocate] sweeping mouse \(approachPoint) → \(edgePoint)")
-
+                logger.info("relocate: sweeping to '\(display.name, privacy: .public)'")
                 self.sweepCursor(from: approachPoint, to: edgePoint, source: source)
+                logger.info("relocate: dwelling at edge")
                 self.dwellAtEdge(edgePoint, source: source)
+                logger.info("relocate: restoring cursor")
                 self.restoreCursor(to: originalPosition, mainScreenHeight: mainScreenHeight)
 
                 self.isRelocating = false
+                logger.info("relocate: isRelocating cleared")
 
                 // removeTemporaryTap must run on the main thread — it accesses eventTap/runLoopSource
                 // which are also written by startTracking/stopTracking on the main thread.
                 DispatchQueue.main.sync {
+                    self.logger.info("relocate: removeTemporaryTap+unhide (main thread)")
                     self.removeTemporaryTap()
                     NSCursor.unhide()
                 }
@@ -365,8 +376,12 @@ class DockRelocationService: @unchecked Sendable {
     }
 
     private func dwellAtEdge(_ point: CGPoint, source: CGEventSource?) {
+        logger.info("dwellAtEdge: decoupling cursor (CGAssociateMouseAndMouseCursorPosition=0)")
         CGAssociateMouseAndMouseCursorPosition(0)
-        defer { CGAssociateMouseAndMouseCursorPosition(1) }
+        defer {
+            CGAssociateMouseAndMouseCursorPosition(1)
+            logger.info("dwellAtEdge: recoupled cursor (CGAssociateMouseAndMouseCursorPosition=1)")
+        }
         CGWarpMouseCursorPosition(point)
 
         for _ in 0..<20 {

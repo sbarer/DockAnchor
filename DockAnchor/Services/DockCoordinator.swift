@@ -7,9 +7,11 @@ import Foundation
 import Cocoa
 import Combine
 import CoreGraphics
+import os.log
 
 class DockCoordinator: ObservableObject {
     static let shared = DockCoordinator()
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "DockAnchorDeluxe", category: "DockCoordinator")
 
     // MARK: - Published
     @Published private(set) var isActive: Bool = false
@@ -155,31 +157,31 @@ class DockCoordinator: ObservableObject {
     // MARK: - Monitoring lifecycle
 
     func startMonitoring() {
-        print("[DockCoordinator] startMonitoring: called — isActive=\(isActive) AXTrusted=\(AXIsProcessTrusted()) anchorID=\(anchorDisplayID)")
+        logger.info("startMonitoring: isActive=\(self.isActive, privacy: .public) AXTrusted=\(AXIsProcessTrusted(), privacy: .public)")
         guard PermissionService.shared.check() else {
             needsPermissionReset = true
             statusMessage = "Accessibility permissions required"
-            print("[DockCoordinator] startMonitoring: FAILED — no AX permission")
+            logger.error("startMonitoring: FAILED — no AX permission")
             return
         }
         guard !isActive else {
-            print("[DockCoordinator] startMonitoring: already active, skipping")
+            logger.info("startMonitoring: already active, skipping")
             return
         }
         guard MouseTrackingService.shared.startTracking() else {
             needsPermissionReset = true
-            print("[DockCoordinator] startMonitoring: FAILED — startTracking returned false")
+            logger.error("startMonitoring: FAILED — startTracking returned false")
             return
         }
         PermissionService.shared.startPolling(interval: 5.0)
         startPositionCheckTimer()
         isActive = true
         statusMessage = "Dock Anchor Deluxe Active - Monitoring mouse movement"
-        print("[DockCoordinator] startMonitoring: SUCCESS — isActive=true")
+        logger.info("startMonitoring: SUCCESS — monitoring active")
     }
 
     func stopMonitoring() {
-        print("[DockCoordinator] stopMonitoring: called")
+        logger.info("stopMonitoring: isActive=\(self.isActive, privacy: .public) isRelocating=\(DockRelocationService.shared.isRelocating, privacy: .public)")
         PermissionService.shared.stopPolling()
         stopPositionCheckTimer()
         stopHotCornerWatch()
@@ -337,23 +339,28 @@ class DockCoordinator: ObservableObject {
     // MARK: - Sleep / wake
 
     func handleSystemSleep() {
-        print("[DockCoordinator] handleSystemSleep: stopping monitoring")
+        logger.info("handleSystemSleep: stopping monitoring — isRelocating=\(DockRelocationService.shared.isRelocating, privacy: .public)")
         stopMonitoring()
     }
 
     func handleSystemWake() {
-        print("[DockCoordinator] handleSystemWake: stopping and restarting monitoring")
+        logger.info("handleSystemWake: stopping and restarting monitoring — AXTrusted=\(AXIsProcessTrusted(), privacy: .public)")
         stopMonitoring()
         guard PermissionService.shared.check() else {
-            print("[DockCoordinator] handleSystemWake: no AX permission — skipping restart")
+            logger.error("handleSystemWake: no AX permission after wake — skipping restart")
             return
         }
-        guard AppSettings.shared.runInBackground else { return }
+        guard AppSettings.shared.runInBackground else {
+            logger.info("handleSystemWake: runInBackground=false — not restarting")
+            return
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.logger.info("handleSystemWake: 1s delay elapsed — calling startMonitoring")
             self?.startMonitoring()
         }
         if AppSettings.shared.autoRelocateDock {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.logger.info("handleSystemWake: 1.5s delay elapsed — calling relocateDock")
                 self?.relocateDock()
             }
         }
@@ -362,6 +369,7 @@ class DockCoordinator: ObservableObject {
     // MARK: - Permission
 
     func handlePermissionRevoked() {
+        logger.error("handlePermissionRevoked: AX permission revoked during monitoring")
         statusMessage = "Accessibility permissions revoked - stopping monitoring"
         stopMonitoring()
     }

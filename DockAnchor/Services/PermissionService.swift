@@ -6,9 +6,11 @@
 import Foundation
 import Cocoa
 import ApplicationServices
+import os.log
 
 class PermissionService {
     static let shared = PermissionService()
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "DockAnchorDeluxe", category: "PermissionService")
 
     private(set) var isGranted: Bool = false
 
@@ -58,6 +60,7 @@ class PermissionService {
 
     private func poll() {
         guard !AXIsProcessTrusted() else { return }
+        logger.error("poll: AX permission revoked — firing onRevoked")
         // Stop polling immediately to prevent multiple onRevoked calls before stopMonitoring runs
         stopPolling()
         onRevoked?()

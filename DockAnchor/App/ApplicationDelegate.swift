@@ -4,17 +4,19 @@
 //
 
 import Cocoa
+import os.log
 
 class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var appSettings: AppSettings { AppSettings.shared }
     private var coordinator: DockCoordinator { DockCoordinator.shared }
     private var menuBarManager: MenuBarManager { MenuBarManager.shared }
     private var updateChecker: UpdateChecker { UpdateChecker.shared }
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "DockAnchorDeluxe", category: "AppDelegate")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
 
-        print("[AppDelegate] applicationDidFinishLaunching: AXTrusted=\(AXIsProcessTrusted()) runInBackground=\(appSettings.runInBackground) autoRelocate=\(appSettings.autoRelocateDock)")
+        logger.info("applicationDidFinishLaunching: PID=\(ProcessInfo.processInfo.processIdentifier, privacy: .public) AXTrusted=\(AXIsProcessTrusted(), privacy: .public) runInBackground=\(self.appSettings.runInBackground, privacy: .public) autoRelocate=\(self.appSettings.autoRelocateDock, privacy: .public)")
 
         NotificationCenter.default.addObserver(
             self, selector: #selector(updateDockVisibility), name: .dockVisibilityChanged, object: nil
@@ -69,19 +71,21 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        logger.info("applicationWillTerminate: called — clean exit path")
         coordinator.stopMonitoring()
         NotificationCenter.default.removeObserver(self)
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 
     @objc private func handleSystemSleep() {
-        print("[AppDelegate] handleSystemSleep: stopping monitoring before sleep")
+        logger.info("handleSystemSleep: willSleepNotification received — stopping monitoring")
         coordinator.handleSystemSleep()
     }
 
     @objc private func handleSystemWake() {
-        print("[AppDelegate] handleSystemWake: system woke from sleep — scheduling monitoring restart")
+        logger.info("handleSystemWake: didWakeNotification received — scheduling restart in 2s")
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.logger.info("handleSystemWake: 2s delay elapsed — calling coordinator.handleSystemWake")
             self?.coordinator.handleSystemWake()
         }
     }

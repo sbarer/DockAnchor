@@ -6,6 +6,7 @@
 import Foundation
 import Cocoa
 import CoreGraphics
+import os.log
 
 struct AnchorState {
     var isDockAnchored: Bool = true
@@ -15,6 +16,7 @@ struct AnchorState {
 
 class MouseTrackingService {
     static let shared = MouseTrackingService()
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "DockAnchorDeluxe", category: "MouseTrackingService")
 
     private(set) var isTracking: Bool = false
     var eventTap: CFMachPort?
@@ -32,20 +34,20 @@ class MouseTrackingService {
     // MARK: - Public API
 
     func startTracking() -> Bool {
-        print("[MouseTrackingService] startTracking: called — AXTrusted=\(AXIsProcessTrusted()) isTracking=\(isTracking)")
+        logger.info("startTracking: AXTrusted=\(AXIsProcessTrusted(), privacy: .public) isTracking=\(self.isTracking, privacy: .public) tapValid=\(self.isEventTapValid(), privacy: .public)")
         guard AXIsProcessTrusted() else {
-            print("[MouseTrackingService] startTracking: FAILED — not AX trusted")
+            logger.error("startTracking: FAILED — not AX trusted")
             onStatusMessage?("Please grant accessibility permissions in System Preferences")
             return false
         }
 
         if isTracking {
             if isEventTapValid() {
-                print("[MouseTrackingService] startTracking: already tracking with valid tap, skipping")
+                logger.info("startTracking: already tracking with valid tap, skipping")
                 return true
             }
             // Tap was invalidated (e.g. wake from sleep) — force reset before reinstalling
-            print("[MouseTrackingService] startTracking: tap invalid despite isTracking=true, resetting")
+            logger.warning("startTracking: tap invalid despite isTracking=true — forcing reset")
             isTracking = false
             eventTap = nil
             runLoopSource = nil
@@ -54,18 +56,18 @@ class MouseTrackingService {
         installEventTap()
 
         guard eventTap != nil else {
-            print("[MouseTrackingService] startTracking: FAILED — eventTap is nil after install")
+            logger.error("startTracking: FAILED — eventTap is nil after install (AXTrusted=\(AXIsProcessTrusted(), privacy: .public))")
             onStatusMessage?("Permission needs reset - remove and re-add app in Accessibility settings")
             return false
         }
 
         isTracking = true
-        print("[MouseTrackingService] startTracking: SUCCESS — tap installed, isTracking=true")
+        logger.info("startTracking: SUCCESS — tap installed")
         return true
     }
 
     func stopTracking() {
-        print("[MouseTrackingService] stopTracking: isTracking=\(isTracking)")
+        logger.info("stopTracking: isTracking=\(self.isTracking, privacy: .public) tapValid=\(self.isEventTapValid(), privacy: .public)")
         guard isTracking else { return }
 
         isTracking = false
@@ -79,7 +81,7 @@ class MouseTrackingService {
             CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .commonModes)
             runLoopSource = nil
         }
-        print("[MouseTrackingService] stopTracking: done")
+        logger.info("stopTracking: done — tap disabled and removed")
     }
 
     func createTemporaryTap() -> Bool {
@@ -94,7 +96,8 @@ class MouseTrackingService {
             options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
-                let service = Unmanaged<MouseTrackingService>.fromOpaque(refcon!).takeUnretainedValue()
+                guard let refcon else { return Unmanaged.passUnretained(event) }
+                let service = Unmanaged<MouseTrackingService>.fromOpaque(refcon).takeUnretainedValue()
                 return service.handleMouseEvent(proxy: proxy, type: type, event: event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
@@ -207,7 +210,7 @@ class MouseTrackingService {
     // MARK: - Private
 
     private func installEventTap() {
-        print("[MouseTrackingService] installEventTap: installing on thread=\(Thread.isMainThread ? "main" : "bg") runLoop=\(CFRunLoopGetCurrent() == CFRunLoopGetMain() ? "main" : "other")")
+        logger.info("installEventTap: AXTrusted=\(AXIsProcessTrusted(), privacy: .public) onMainThread=\(Thread.isMainThread, privacy: .public)")
         let eventMask = CGEventMask(
             (1 << CGEventType.mouseMoved.rawValue) |
             (1 << CGEventType.tapDisabledByTimeout.rawValue) |
@@ -220,7 +223,8 @@ class MouseTrackingService {
             options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
-                let service = Unmanaged<MouseTrackingService>.fromOpaque(refcon!).takeUnretainedValue()
+                guard let refcon else { return Unmanaged.passUnretained(event) }
+                let service = Unmanaged<MouseTrackingService>.fromOpaque(refcon).takeUnretainedValue()
                 if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
                     if let tap = service.eventTap {
                         CGEvent.tapEnable(tap: tap, enable: true)
@@ -236,14 +240,14 @@ class MouseTrackingService {
         )
 
         guard let tap = eventTap else {
-            print("[MouseTrackingService] installEventTap: FAILED — tapCreate returned nil (AXTrusted=\(AXIsProcessTrusted()))")
+            logger.error("installEventTap: FAILED — CGEvent.tapCreate returned nil (AXTrusted=\(AXIsProcessTrusted(), privacy: .public))")
             return
         }
 
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        print("[MouseTrackingService] installEventTap: SUCCESS — tap=\(tap)")
+        logger.info("installEventTap: SUCCESS — tap created and enabled")
     }
 
     private func handleMouseEvent(
