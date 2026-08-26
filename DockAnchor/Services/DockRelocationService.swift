@@ -346,7 +346,10 @@ class DockRelocationService: @unchecked Sendable {
         }
 
         var position = CGPoint.zero
-        guard let pv = positionValue, AXValueGetValue(pv as! AXValue, .cgPoint, &position) else { return nil }
+        // AXValue is a CF type; unsafeBitCast is the correct Swift idiom for CF bridging
+        // (as? AXValue is a compiler error, as! is what this replaces at the same cost)
+        guard let pv = positionValue,
+              AXValueGetValue(unsafeBitCast(pv, to: AXValue.self), .cgPoint, &position) else { return nil }
         let found = displays.first { $0.frame.contains(position) }
         print("[DockRelocationService:currentDockDisplayIDViaAX] dock at \(position) → '\(found?.name ?? "none")'")
         return found?.id
