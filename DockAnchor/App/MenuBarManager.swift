@@ -279,24 +279,18 @@ class MenuBarManager: NSObject, ObservableObject {
     }
 
     @objc func showMainWindow() {
-        // Always switch to .regular so NSApp.activate reliably takes focus.
-        // WindowHiderDelegate restores .accessory on close when hideFromDock = true.
-        NSApp.setActivationPolicy(.regular)
-
-        DispatchQueue.main.async {
+        // .accessory apps can activate and show windows without switching to .regular.
+        // Switching policies triggers FBSWorkspaceScenesClient failures on Sequoia which
+        // invalidates the status bar scene and causes a crash when subscriptions touch it.
+        NSApp.activate(ignoringOtherApps: true)
+        for window in NSApp.windows where window.level == .normal && window.frame.width > 100 && window.frame.height > 100 {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             NSApp.activate(ignoringOtherApps: true)
-            DistributedNotificationCenter.default().post(name: NSNotification.Name("com.apple.dock.refresh"), object: nil)
-
-            for window in NSApp.windows where window.level == .normal && window.frame.width > 100 && window.frame.height > 100 {
-                window.makeKeyAndOrderFront(nil)
-                return
-            }
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                NSApp.activate(ignoringOtherApps: true)
-                for window in NSApp.windows where window.level == .normal && window.frame.width > 100 {
-                    window.makeKeyAndOrderFront(nil); break
-                }
+            for window in NSApp.windows where window.level == .normal && window.frame.width > 100 {
+                window.makeKeyAndOrderFront(nil); break
             }
         }
     }
