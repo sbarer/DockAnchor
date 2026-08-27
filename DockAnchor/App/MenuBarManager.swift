@@ -14,6 +14,7 @@ class MenuBarManager: NSObject, ObservableObject {
     private var coordinator: DockCoordinator?
     private var updateChecker: UpdateChecker?
     private var cancellables = Set<AnyCancellable>()
+    private var bindingCancellables = Set<AnyCancellable>()
 
     deinit {
         removeStatusBar()
@@ -42,6 +43,7 @@ class MenuBarManager: NSObject, ObservableObject {
 
     private func setupStatusBar() {
         removeStatusBar()
+        bindingCancellables.removeAll()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem?.button {
             let symbolConfig = NSImage.SymbolConfiguration(pointSize: 17.6, weight: .regular)
@@ -170,28 +172,28 @@ class MenuBarManager: NSObject, ObservableObject {
         coordinator.$isActive.receive(on: DispatchQueue.main).sink { [weak self] isActive in
             self?.updateStatusMenuItem(statusMenuItem, isActive: isActive)
             toggleMenuItem.title = isActive ? "Stop Protection" : "Start Protection"
-        }.store(in: &cancellables)
+        }.store(in: &bindingCancellables)
 
         coordinator.$anchoredDisplayName.receive(on: DispatchQueue.main).sink { [weak self] name in
             anchorMenuItem.title = "📍 \(name)"
             self?.refreshDisplaySubmenu()
-        }.store(in: &cancellables)
+        }.store(in: &bindingCancellables)
 
         coordinator.$statusMessage.receive(on: DispatchQueue.main).sink { [weak self] msg in
             self?.statusItem?.button?.toolTip = "Dock Anchor Deluxe - \(msg)"
-        }.store(in: &cancellables)
+        }.store(in: &bindingCancellables)
 
         coordinator.$displays.receive(on: DispatchQueue.main).sink { [weak self] _ in
             self?.updateDisplaySubmenu()
-        }.store(in: &cancellables)
+        }.store(in: &bindingCancellables)
 
         appSettings.$profiles.receive(on: DispatchQueue.main).sink { [weak self] _ in
             self?.refreshProfilesSubmenu()
-        }.store(in: &cancellables)
+        }.store(in: &bindingCancellables)
 
         appSettings.$activeProfileID.receive(on: DispatchQueue.main).sink { [weak self] _ in
             self?.refreshProfilesSubmenu()
-        }.store(in: &cancellables)
+        }.store(in: &bindingCancellables)
     }
 
     private func updateStatusMenuItem(_ item: NSMenuItem, isActive: Bool) {
