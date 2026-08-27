@@ -31,23 +31,23 @@ class ApplicationDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         updateActivationPolicy()
 
         guard PermissionService.shared.check() else {
-            print("[AppDelegate] applicationDidFinishLaunching: AX permission not granted — skipping monitoring setup")
+            logger.warning("applicationDidFinishLaunching: AX permission not granted — skipping monitoring setup")
             return
         }
         coordinator.changeAnchorDisplay(toUUID: appSettings.selectedDisplayUUID)
 
         if appSettings.runInBackground {
-            print("[AppDelegate] applicationDidFinishLaunching: scheduling startMonitoring in 1.0s")
+            logger.info("applicationDidFinishLaunching: scheduling startMonitoring in 1.0s")
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                print("[AppDelegate] startMonitoring: firing")
+                self?.logger.info("startMonitoring: firing")
                 self?.coordinator.startMonitoring()
             }
         } else {
-            print("[AppDelegate] applicationDidFinishLaunching: runInBackground=false — monitoring NOT auto-started")
+            logger.info("applicationDidFinishLaunching: runInBackground=false — monitoring not auto-started")
         }
         if appSettings.autoRelocateDock {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                print("[AppDelegate:autoRelocateDock] firing relocateDock")
+                self?.logger.info("autoRelocateDock: firing relocateDock")
                 self?.coordinator.relocateDock()
             }
         }

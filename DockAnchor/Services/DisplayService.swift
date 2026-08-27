@@ -7,6 +7,7 @@ import Foundation
 import Cocoa
 import CoreGraphics
 import IOKit
+import os.log
 
 // MARK: - Private free functions
 
@@ -70,6 +71,7 @@ private func createStableDisplayFingerprint(for displayID: CGDirectDisplayID) ->
 
 class DisplayService: ObservableObject {
     static let shared = DisplayService()
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "DockAnchorDeluxe", category: "DisplayService")
 
     @Published private(set) var displays: [DisplayInfo] = []
 
@@ -151,7 +153,7 @@ class DisplayService: ObservableObject {
 
     private func refresh() {
         let newDisplays = enumerate()
-        print("[DisplayService:refresh] found \(newDisplays.count) displays: \(newDisplays.map { "\($0.name) id=\($0.id)" })")
+        logger.info("refresh: found \(newDisplays.count, privacy: .public) displays: \(newDisplays.map { $0.name }.joined(separator: ", "), privacy: .public)")
         // Always called from main thread (init + handleReconfiguration). Update synchronously
         // so callers can read the updated `displays` array immediately after this returns.
         displays = newDisplays
@@ -211,18 +213,18 @@ class DisplayService: ObservableObject {
     }
 
     private func handleReconfiguration(displayID: CGDirectDisplayID, flags: CGDisplayChangeSummaryFlags) {
-        print("[DisplayService] handleReconfiguration: displayID=\(displayID) flags=\(flags.rawValue)")
+        logger.info("handleReconfiguration: flags=\(flags.rawValue, privacy: .public)")
         if flags.contains(.addFlag) {
             refresh()
             if let added = displays.first(where: { $0.id == displayID }) {
-                print("[DisplayService] handleReconfiguration: display added — \(added.name) id=\(added.id)")
+                logger.info("handleReconfiguration: display added — '\(added.name, privacy: .public)'")
                 onDisplayAdded?(added)
             } else {
-                print("[DisplayService] handleReconfiguration: addFlag but displayID \(displayID) not found in current displays (may need to wait for refresh)")
+                logger.warning("handleReconfiguration: addFlag but display not found after refresh")
             }
         } else if flags.contains(.removeFlag) {
             refresh()
-            print("[DisplayService] handleReconfiguration: display removed id=\(displayID)")
+            logger.info("handleReconfiguration: display removed")
             onDisplayRemoved?(displayID)
         } else if flags.contains(.movedFlag) ||
                   flags.contains(.desktopShapeChangedFlag) ||

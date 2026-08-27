@@ -85,7 +85,7 @@ class MouseTrackingService {
     }
 
     func createTemporaryTap() -> Bool {
-        print("[MouseTrackingService] createTemporaryTap: called — eventTap exists=\(eventTap != nil)")
+        logger.info("createTemporaryTap: eventTap exists=\(self.eventTap != nil, privacy: .public)")
         guard eventTap == nil else { return false }
 
         let eventMask = CGEventMask(1 << CGEventType.mouseMoved.rawValue)
@@ -104,19 +104,19 @@ class MouseTrackingService {
         )
 
         guard let tap = eventTap else {
-            print("[MouseTrackingService] createTemporaryTap: FAILED — tapCreate returned nil")
+            logger.error("createTemporaryTap: FAILED — tapCreate returned nil")
             return false
         }
 
         runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        print("[MouseTrackingService] createTemporaryTap: SUCCESS")
+        logger.info("createTemporaryTap: SUCCESS")
         return true
     }
 
     func removeTemporaryTap() {
-        print("[MouseTrackingService] removeTemporaryTap: isTracking=\(isTracking)")
+        logger.info("removeTemporaryTap: isTracking=\(self.isTracking, privacy: .public)")
         guard !isTracking else { return }
 
         if let tap = eventTap {
@@ -188,13 +188,13 @@ class MouseTrackingService {
 
         if AppSettings.shared.isHotCornersPreserved(forDisplayUUID: currentDisplay.uuid) &&
            isInCornerZone(location, display: currentDisplay) {
-            print("[MouseTrackingService::shouldBlock]  hot corner — allowing through")
+            logger.debug("shouldBlock: hot corner on '\(currentDisplay.name, privacy: .public)' — allowing")
             onHotCornerDetected?()
             return false
         }
 
         if zone.contains(location) {
-            print("[MouseTrackingService::shouldBlock] BLOCKING at \(currentDisplay.name)")
+            logger.info("shouldBlock: BLOCKING at '\(currentDisplay.name, privacy: .public)'")
             DispatchQueue.main.async { [weak self] in
                 self?.onStatusMessage?("Blocked dock movement attempt to \(currentDisplay.name)")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in

@@ -42,12 +42,13 @@ class DockRelocationService: @unchecked Sendable {
             isDockOnCorrectDisplay(display, dockPosition: dockPosition)
         }
         guard !shouldSkip else {
+            logger.info("relocate: dock already on '\(display.name, privacy: .public)' — skipping")
             onStatusMessage?("Dock is already on \(display.name)")
             return
         }
 
         guard !isRelocating else {
-            print("[DockRelocationService] relocate: skipped — already relocating")
+            logger.info("relocate: skipped — already relocating")
             return
         }
 
@@ -172,16 +173,16 @@ class DockRelocationService: @unchecked Sendable {
         if let state = detectCurrentDockState() {
             let detectedName = DisplayService.shared.displays.first { $0.id == state.displayID }?.name ?? "unknown"
             let result = state.displayID == display.id
-            print("[DockRelocationService:isDockOnCorrectDisplay] dock on \(detectedName), anchor \(display.name) → match=\(result)")
+            logger.info("isDockOnCorrectDisplay: dock on '\(detectedName, privacy: .public)', anchor '\(display.name, privacy: .public)' → match=\(result, privacy: .public)")
             return result
         }
         guard let currentID = currentDockDisplayID(dockPosition: dockPosition) else {
-            print("[DockRelocationService:isDockOnCorrectDisplay] AX fallback returned nil — assuming not on anchor")
+            logger.warning("isDockOnCorrectDisplay: AX fallback returned nil — assuming not on anchor")
             return false
         }
         let foundName = DisplayService.shared.displays.first { $0.id == currentID }?.name ?? "unknown"
         let result = currentID == display.id
-        print("[DockRelocationService:isDockOnCorrectDisplay] dock on \(foundName), anchor \(display.name) → match=\(result)")
+        logger.info("isDockOnCorrectDisplay: dock on '\(foundName, privacy: .public)', anchor '\(display.name, privacy: .public)' → match=\(result, privacy: .public)")
         return result
     }
 
@@ -243,7 +244,7 @@ class DockRelocationService: @unchecked Sendable {
 
         let free = subtractRanges(from: (rangeMin, rangeMax), subtract: covered)
         let best = free.max(by: { ($0.1 - $0.0) < ($1.1 - $1.0) }) ?? (rangeMin, rangeMax)
-        print("[DockRelocationService:safeEdgeOffset] '\(display.name)' range=\(rangeMin)..\(rangeMax) covered=\(covered) best=\(best)")
+        logger.debug("safeEdgeOffset: '\(display.name, privacy: .public)' best=(\(best.0, privacy: .public)..\(best.1, privacy: .public))")
         return (best.0 + best.1) / 2
     }
 
@@ -304,13 +305,13 @@ class DockRelocationService: @unchecked Sendable {
             let vf = screen.visibleFrame
             switch dockPosition {
             case .bottom where vf.minY > f.minY:
-                print("[DockRelocationService:currentDockDisplayID] dock on '\(screen.localizedName)' (bottom)")
+                logger.debug("currentDockDisplayID: dock on '\(screen.localizedName, privacy: .public)' (bottom)")
                 return displayID
             case .left where vf.minX > f.minX:
-                print("[DockRelocationService:currentDockDisplayID] dock on '\(screen.localizedName)' (left)")
+                logger.debug("currentDockDisplayID: dock on '\(screen.localizedName, privacy: .public)' (left)")
                 return displayID
             case .right where vf.maxX < f.maxX:
-                print("[DockRelocationService:currentDockDisplayID] dock on '\(screen.localizedName)' (right)")
+                logger.debug("currentDockDisplayID: dock on '\(screen.localizedName, privacy: .public)' (right)")
                 return displayID
             default: continue
             }
@@ -321,11 +322,11 @@ class DockRelocationService: @unchecked Sendable {
 
     private func currentDockDisplayIDViaAX() -> CGDirectDisplayID? {
         let displays = DisplayService.shared.displays
-        print("[DockRelocationService:currentDockDisplayIDViaAX] falling back to AX")
+        logger.debug("currentDockDisplayIDViaAX: falling back to AX")
         guard let dockApp = NSRunningApplication.runningApplications(
             withBundleIdentifier: "com.apple.dock"
         ).first else {
-            print("[DockRelocationService:currentDockDisplayIDViaAX] dock app not found")
+            logger.warning("currentDockDisplayIDViaAX: dock app not found")
             return nil
         }
 
@@ -333,7 +334,7 @@ class DockRelocationService: @unchecked Sendable {
         var windowsValue: CFTypeRef?
         guard AXUIElementCopyAttributeValue(dockElement, kAXWindowsAttribute as CFString, &windowsValue) == .success,
               let windows = windowsValue as? [AXUIElement], !windows.isEmpty else {
-            print("[DockRelocationService:currentDockDisplayIDViaAX] AX windows query failed")
+            logger.warning("currentDockDisplayIDViaAX: AX windows query failed")
             return nil
         }
 
@@ -341,7 +342,7 @@ class DockRelocationService: @unchecked Sendable {
         guard AXUIElementCopyAttributeValue(
             windows[0], kAXPositionAttribute as CFString, &positionValue
         ) == .success else {
-            print("[DockRelocationService:currentDockDisplayIDViaAX] AX position query failed")
+            logger.warning("currentDockDisplayIDViaAX: AX position query failed")
             return nil
         }
 
@@ -351,7 +352,7 @@ class DockRelocationService: @unchecked Sendable {
         guard let pv = positionValue,
               AXValueGetValue(unsafeBitCast(pv, to: AXValue.self), .cgPoint, &position) else { return nil }
         let found = displays.first { $0.frame.contains(position) }
-        print("[DockRelocationService:currentDockDisplayIDViaAX] dock at \(position) → '\(found?.name ?? "none")'")
+        logger.debug("currentDockDisplayIDViaAX: dock → '\(found?.name ?? "none", privacy: .public)'")
         return found?.id
     }
 
@@ -403,6 +404,6 @@ class DockRelocationService: @unchecked Sendable {
     private func restoreCursor(to position: CGPoint, mainScreenHeight: CGFloat) {
         let safePosition = clampedToScreenEdge(position, mainScreenHeight: mainScreenHeight)
         CGWarpMouseCursorPosition(safePosition)
-        print("[DockRelocationService:restoreCursor] restored mouse to \(safePosition) (original: \(position))")
+        logger.info("restoreCursor: restored to (\(safePosition.x, privacy: .public), \(safePosition.y, privacy: .public))")
     }
 }

@@ -5,9 +5,11 @@
 
 import Foundation
 import Cocoa
+import os.log
 
 class DockResizeService {
     static let shared = DockResizeService()
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "DockAnchorDeluxe", category: "DockResizeService")
     private init() {}
 
     // MARK: - Public API
@@ -69,7 +71,7 @@ class DockResizeService {
         var errorInfo: NSDictionary?
         script?.executeAndReturnError(&errorInfo)
         if let errorInfo = errorInfo {
-            print("[DockResizeService] AppleScript error: \(errorInfo)")
+            logger.error("runAppleScript: error \(errorInfo, privacy: .public)")
         }
     }
 
