@@ -48,12 +48,12 @@ class DockCoordinator: ObservableObject {
         anchorDisplayUUID = AppSettings.shared.selectedDisplayUUID
         displays = DisplayService.shared.displays
         let anchorDisplayName = DisplayService.shared.display(forUUID: anchorDisplayUUID)?.name ?? "Default"
-        logger.info("setupInitialState: anchorDisplay='\(anchorDisplayName, privacy: .public)' displays=\(displays.count, privacy: .public) AXTrusted=\(AXIsProcessTrusted(), privacy: .public)")
+        logger.info("setupInitialState: anchorDisplay='\(anchorDisplayName, privacy: .public)' displays=\(self.displays.count, privacy: .public) AXTrusted=\(AXIsProcessTrusted(), privacy: .public)")
         DisplayService.shared.$displays
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newDisplays in
                 self?.displays = newDisplays
-                logger.info("setupInitialState: displays updated count=\(newDisplays.count, privacy: .public)")
+                self?.logger.info("setupInitialState: displays updated count=\(newDisplays.count, privacy: .public)")
             }
             .store(in: &cancellables)
         let systemPosition = DockResizeService.shared.currentPosition()
@@ -67,7 +67,7 @@ class DockCoordinator: ObservableObject {
             dockPosition = systemPosition
         }
         let dockScreen = DockRelocationService.shared.detectCurrentDockState().flatMap { state in DisplayService.shared.displays.first { $0.id == state.displayID } }?.name ?? "unknown"
-        logger.info("setupInitialState: dockPosition=\(dockPosition.rawValue, privacy: .public) dockOn='\(dockScreen, privacy: .public)' anchor='\(anchoredDisplayName, privacy: .public)'")
+        logger.info("setupInitialState: dockPosition=\(self.dockPosition.rawValue, privacy: .public) dockOn='\(dockScreen, privacy: .public)' anchor='\(self.anchoredDisplayName, privacy: .public)'")
         updateAnchoredDisplayName()
         refreshAnchoredState()
         if !PermissionService.shared.check() {
@@ -196,7 +196,7 @@ class DockCoordinator: ObservableObject {
         if DisplayService.shared.isAvailable(uuid: uuid) {
             anchorDisplayUUID = uuid
             updateAnchoredDisplayName()
-            logger.info("changeAnchorDisplay: → '\(anchoredDisplayName, privacy: .public)'")
+            logger.info("changeAnchorDisplay: → '\(self.anchoredDisplayName, privacy: .public)'")
             postStatus("Anchor changed to \(anchoredDisplayName)")
         } else {
             let defaultUUID = defaultAnchorDisplayUUID()
@@ -430,7 +430,7 @@ class DockCoordinator: ObservableObject {
     }
 
     private func hotCornerTick() {
-        logger.info("hotCornerTick: attempt \(hotCornerAttempts, privacy: .public)")
+        logger.info("hotCornerTick: attempt \(self.hotCornerAttempts, privacy: .public)")
         guard let anchorDisplay = DisplayService.shared.display(forUUID: anchorDisplayUUID) else {
             logger.warning("hotCornerTick: anchor display unavailable — stopping watch")
             stopHotCornerWatch()
@@ -470,7 +470,7 @@ class DockCoordinator: ObservableObject {
             return // autohide or transitioning — keep current isDockAnchored rather than defaulting to false
         }
         if dockPosition != state.position {
-            logger.info("refreshAnchoredState: correcting dockPosition \(dockPosition.rawValue, privacy: .public) → \(state.position.rawValue, privacy: .public)")
+            logger.info("refreshAnchoredState: correcting dockPosition \(self.dockPosition.rawValue, privacy: .public) → \(state.position.rawValue, privacy: .public)")
             dockPosition = state.position
         }
         isDockAnchored = state.displayID == anchorDisplay.id
